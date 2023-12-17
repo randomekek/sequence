@@ -1,0 +1,271 @@
+===
+logs/20230808-235948.py
+
+see if it is possible to train memory too
+
+===
+logs/20230809-000554.py
+
+compare against similarly long run with fixed memory
+
+result:
+it appears like training memory gives slight benefits, viewing the plot it appears
+like there is no particular value to it
+
+===
+logs/20230810-184035.py
+
+partition const and dynamic fields to see if it changes anything
+
+===
+logs/20230810-184342.py
+
+remove stopgradient and verify it is the same
+
+===
+logs/20230810-184606.py
+
+verify increasing memory size actually memorizes
+
+result: with 500, it can almost perfectly memorize it
+===
+logs/20230810-191908.py
+
+learn everything with a big model
+
+===
+logs/20230810-202925.py
+
+try out TDLN
+
+result: it learns patchy data not very good
+
+===
+logs/20230810-203338.py
+
+debug TDLN, is it because T, set T=1 so it's equal to DLN
+
+===
+logs/20230810-203632.py
+
+debug TDLN, is it because T, set T=1 so it's equal to DLN
+
+result: seems like setting T=1 reduces to DLN
+
+
+===
+logs/20230810-205047.py
+
+unify DLN and TDLN, run TDLN, T=1
+
+===
+logs/20230810-213808.py
+
+unify DLN and TDLN, run TDLN, T=1
+
+===
+logs/20230810-221135.py
+
+run TDLN, without T bias
+
+===
+logs/20230810-221217.py
+
+run TDLN, without T bias
+
+===
+logs/20230810-221444.py
+
+run TDLN, without T bias, multilevel
+
+===
+logs/20230810-223703.py
+
+validate TDLN space via interpolating two digits
+
+result: it does interpolate correctly! this is good
+
+===
+logs/20230810-224054.py
+
+run TDLN, without T bias, 3 layers of TDLN
+
+result: deeper learns, need ablation to see if it's just the highway
+it appears like learning is slower in time axis, but the same in the epoch axis
+
+===
+logs/20230810-225233.py
+
+train TDLN missing digit 4, to see what happens
+
+result: it works, 4 no longer can be recognized and also you can interpolate 
+it is learning digits, rather than memorizing shapes
+
+===
+logs/20230810-225938.py
+
+train a faster TDLN with 1 level, without digit 4
+
+===
+logs/20230812-180730.py
+
+train a TDLN on wikitext2
+
+result: only get 159 nothing else
+
+===
+logs/20230812-182344.py
+
+train a TDLN on wikitext2, remove partition
+
+===
+logs/20230812-182610.py
+
+train a TDLN on wikitext2, remove partition, reduce adam
+
+===
+logs/20230812-182751.py
+
+train a TDLN on wikitext2, remove partition, reduce adam, fix accuracy fn
+
+===
+logs/20230812-190728.py
+
+train a TDLN on wikitext2, remove partition, reduce adam, fix accuracy fn
+
+===
+logs/20230812-191614.py
+
+train a TDLN on wikitext2, remove partition, reduce adam, fix accuracy fn
+
+===
+logs/20230812-191938.py
+
+train a TDLN on wikitext2, remove partition, reduce adam, fix accuracy fn
+
+===
+logs/20230812-195434.py
+
+try on a trivial case with one string to see memorization
+
+result: memorization is instant, discovered bug where i indexed the array via x[:][y] where i really meant x[:,y]
+
+===
+logs/20230812-195711.py
+
+retrain TDLN with bug fix
+
+result: does not learn, at least now it outputs aaaaaa
+
+===
+logs/20230812-200358.py
+
+try trivial DLN with two possible sentences
+
+===
+logs/20230812-200455.py
+
+try trivial DLN with two possible sentences
+
+result: two sentences works, can memorize
+
+===
+logs/20230812-200805.py
+
+try trivial DLN with two possible sentences
+
+===
+logs/20230812-201435.py
+
+try TDLN on just 5 wiki entries
+
+===
+logs/20230812-201546.py
+
+try TDLN on just 5 wiki entries
+
+===
+logs/20230812-201704.py
+
+try TDLN on just 5 wiki entries
+
+===
+logs/20230812-201728.py
+
+try TDLN on just 5 wiki entries
+
+result: it does learn up to 500 length sequence, however it does not learn local effects
+if input is text[1:] it will fail to predict the sequence
+
+===
+logs/20230814-221319.py
+
+try DLN using character level prediction
+
+===
+logs/20230814-223153.py
+
+try DLN using character level prediction, this time using binary cross entropy
+
+result: it learns to memorize, but still cannot predict sequence.
+binary is hard to decode too, suggest using 255-ary prediction
+
+===
+logs/20230817-231757.py
+
+try DLN using character level 256 way softmax
+
+result: output is all 0s and resulting softmax outputs equal probability of all letters
+on introspection, they were slightly different, still had 0/200 accuracy
+i'm not sure how it can fail accuracy this bad, as random chance implies 1/256
+
+===
+logs/20230817-233350.py
+
+try DLN using character level 256 way softmax
+
+result: turns out 0 accuracy is because we are looking at a bad section
+it can spell 'the' and 'ion' suffix.
+discovered bug in the accuracy code.
+
+feature: continue training to save sunk time
+  - relatively simple we just need to use global to save optimizer state
+feature: snapshot the model every now and then, so i can play with it in a separate system
+  - when running it will create a folder called current
+  - every minute, it will snapshot the model to the folder (snapshot_1...n)
+  - when restarting, it will delete the model?
+  - may not make sense, since GPU is mostly utilized RAM wise so we cannot run another
+feature: show more decimal points for the loss (2 sig fig)
+
+===
+logs/20230817-235231.py
+
+try DLN using character level 256 way softmax
+
+result: after running for 3k runs, it appears like it can learn the location of spaces
+i'll try a bigger batch size
+
+===
+logs/20230818-002901.py
+
+try using a bigger batch size
+seems to train slightly slower for constant batch*length and increasing batch
+
+===
+logs/20230818-003707.py
+
+see if we can increase the state size by reduce training size
+
+result: yes, it works, seems like there's a tradeoff of model * training size.
+maybe the best deal is to go batch=1, model=big (5000?), length=max for remaining
+
+===
+logs/20231029-160546.py
+
+rerun the base code to see if it still works after 2 month break
+
+===
+logs/20231030-215927.py
+
+try DLN using character level 256 way softmax
+
