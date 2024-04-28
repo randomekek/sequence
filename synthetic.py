@@ -17,7 +17,7 @@ def recall_task(
     fixed_map = jr.randint(fixed_key, (fixed_query_vocab,), value_vocab_min, value_vocab_max)
     def make_batch(key):
         ctx_key, key_key = jr.split(key)
-        ctx_map = jr.randint(ctx_key, (ctx_query_vocab,), 0, value_vocab_min, value_vocab_max)
+        ctx_map = jr.randint(ctx_key, (ctx_query_vocab,), value_vocab_min, value_vocab_max)
         total_map = jnp.concat([fixed_map, ctx_map])
         keys = jr.randint(key_key, (length,), 0, fixed_query_vocab + ctx_query_vocab)
         values = jnp.take(total_map, keys)
@@ -25,3 +25,5 @@ def recall_task(
     return jax.vmap(make_batch)(jr.split(batch_key, batches))
 
 print(recall_task(jr.PRNGKey(1)))
+
+# %%
