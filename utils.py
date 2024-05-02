@@ -40,43 +40,27 @@ def run_const(fn):
     return CONST_LIST[code]
 
 
-def optimize(model, optimizer, get_batch, partition, loss_fn, accuracy_fn, opt_state=None):
-    if opt_state is None:
-        opt_state = optimizer.init(model)
+def optimize(model, opt_state, update, accuracy_fn):
     logs = []
 
     def log(text, end='\n'):
         print(text, end=end)
-        logs.append(text)
-        logs.append(end)
-
-    @eqx.filter_jit
-    def update(model, x, y, opt_state):
-        model_dyn, model_const = eqx.partition(model, partition)
-        loss, grads = loss_fn(model_dyn, model_const, x, y)
-        updates, opt_state = optimizer.update(grads, opt_state)
-        model = eqx.apply_updates(model, updates)
-        return loss, model, opt_state
+        logs.append(text + end)
 
     print('starting')
     t = datetime.datetime.now()
     displayed = 0
     try:
-        for i in range(10000):
-            x, y = get_batch(i + 1)
-            loss, model, opt_state = update(model, x, y, opt_state)
-            if i < 1 or (datetime.datetime.now() - t).total_seconds() > 5.0:
-                log(f'{displayed:02d} {i:04d} {loss:.3e} ', end='')
+        for b in range(10000):
+            loss, model, opt_state = update(b, model, opt_state)
+            if b < 1 or (datetime.datetime.now() - t).total_seconds() > 5.0:
+                log(f'{displayed:02d} {b:04d} {loss:.3e} ', end='')
                 log(f'{accuracy_fn(model)*100:0.1f}%')
                 t = datetime.datetime.now()
                 displayed += 1
     except KeyboardInterrupt:
         print('interrupt')
 
-    log(f'xx {i:04d} accuracy {accuracy_fn(model)*100:0.1f}% (done)')
+    log(f'xx {b:04d} accuracy {accuracy_fn(model)*100:0.1f}% (done)')
 
-    return {
-        'model': model,
-        'opt_state': opt_state,
-        'log': ''.join(logs),
-    }
+    return model, opt_state

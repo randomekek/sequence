@@ -32,15 +32,6 @@ def main():
             return (input, output)
         return jax.vmap(make_batch)(jr.split(batch_key, batches))
 
-    def get_batch(i):
-        return recall_task(
-            key=jr.PRNGKey(i),
-            length=10,
-            fixed_query_vocab=5,
-            ctx_query_vocab=5,
-            value_vocab=10,
-            batches=2)
-
     class Model(eqx.Module):
         pass
 
@@ -54,24 +45,28 @@ def main():
         return fn
 
     @eqx.filter_value_and_grad
-    def loss_fn(model_dyn, model_const, x, y):  # model, model, [B, L], [B, L]
-        model = eqx.combine(model_dyn, model_const)
-        raw_prediction = jax.vmap(model)(x)  # [B, L, C]
-        prediction = jax.nn.softmax(raw_prediction, axis=2)
-        epsilon = 1e-7
-        prediction = jnp.clip(prediction, epsilon, 1.0 - epsilon)
+    def loss_fn(model, x, y):  # model, model, [B, L], [B, L]
+        logits = jax.vmap(model)(x)  # [B, L, C]
+        prediction = jnp.clip(jax.nn.softmax(logits, axis=2), 1e-7, 1.0 - 1e-7)
         ignore_mask = y != ignore_value
         return -jnp.mean(ignore_mask * y * jnp.log(prediction))
 
+    @eqx.filter_jit
+    def update(b, model, opt_state):
+        x, y = recall_task(key=jr.PRNGKey(b), length=10, fixed_query_vocab=5,
+                           ctx_query_vocab=5, value_vocab=10, batches=2)
+        loss, grads = loss_fn(model, x, y)
+        updates, opt_state = optimizer.update(grads, opt_state)
+        model = eqx.apply_updates(model, updates)
+        return loss, model, opt_state
+
     model = Model(jr.PRNGKey(0))
     optimizer = optax.adam(1e-4)  # needs to be lower for more complex models
+    opt_state = optimizer.init(model)
+    accuracy_set = recall_task(key=jr.PRNGKey(-1), length=10, fixed_query_vocab=5,
+                               ctx_query_vocab=5, value_vocab=10, batches=2)
 
-    base_tree = jax.tree_util.tree_map(lambda _: True, model)
-    def fixed(dln): return [dln.size, dln.theta]
-    def dlns(t): return sum([fixed(t.dln)] + [fixed(l[0]) for l in t.layers], start=[])
-    partition = eqx.tree_at(dlns, base_tree, replace_fn=lambda n: False)
-
-    return utils.optimize(model, optimizer, get_batch, partition, loss_fn, accuracy_fn(get_batch(0)))
+    return utils.optimize(model, opt_state, update, accuracy_fn(accuracy_set))
 
 
-main()
+final_model, final_opt_state = main()
