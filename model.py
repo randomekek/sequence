@@ -2,7 +2,6 @@
 import inspect
 import jax
 import jax.numpy as jnp
-import jax.random as jr
 
 # Keep it elementary: jax.Array, list[model]
 # Use params and code flow: seq, linear, affine, residual
@@ -20,13 +19,14 @@ def model(fn):
     def init(self, **kwargs):
         for f in field_names:
             setattr(self, f, kwargs.get(f))
-    def validate(self):
-        missing = [f for f, v in vars(self).items() if v is None]
+    def validate(kwargs):
+        missing = [f for f, v in kwargs.items() if v is None]
         if missing:
             raise TypeError(f'{fn.__name__} missing field: {" ".join(missing)}')
-    def call(self, x):
-        validate(self)
-        return fn(x, **vars(self))
+    def call(self, x, **kwargs):
+        kwargs = vars(self) | kwargs
+        validate(kwargs)
+        return fn(x, **kwargs)
     def repr(self):
         return fn.__name__ + str(vars(self))
     cls = type(fn.__name__, (), {"__init__": init, "__call__": call, "__repr__": repr})
@@ -36,6 +36,23 @@ def model(fn):
         return cls(**{k: v for k, v in zip(field_names, items)})
     jax.tree_util.register_pytree_node(cls, flatten, unflatten)
     return cls
+
+
+class Initializer(object):
+    def __init__(self, key):
+        self.key = key
+
+    def normal(self, shape, stddev):
+        self.key, key = jax.random.split(self.key)
+        return jax.nn.initializers.normal(stddev)(key, shape)
+
+    def golorot_normal(self, shape):
+        self.key, key = jax.random.split(self.key)
+        return jax.nn.initializers.glorot_normal()(key, shape)
+
+    def map(self, num, fn):
+        self.key, *keys = jax.random.split(self.key, num + 1)
+        return [fn(Initializer(x)) for x in keys]
 
 
 def partition_arrays(t):
@@ -50,7 +67,7 @@ def unpartition_arrays(left, right):
 
 def dropout(x, key, p):
     q = 1 - jax.lax.stop_gradient(p)
-    mask = jr.bernoulli(key, q, x.shape)
+    mask = jax.random.bernoulli(key, q, x.shape)
     return jnp.where(mask, x / q, 0)
 
 
