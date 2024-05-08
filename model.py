@@ -1,10 +1,15 @@
 # %%
 import inspect
 import jax
+import jax.numpy as jnp
+import jax.random as jr
 
 # Keep it elementary: jax.Array, list[model]
 # Use params and code flow: seq, linear, affine, residual
 # Use functions: layer norm, dropout
+# Use model: when you need list[model]
+
+# TODO: random & list init, dropout (random key, inference)
 
 
 def model(fn):
@@ -31,3 +36,27 @@ def model(fn):
         return cls(**{k: v for k, v in zip(field_names, items)})
     jax.tree_util.register_pytree_node(cls, flatten, unflatten)
     return cls
+
+
+def partition_arrays(t):
+    left = jax.tree_util.tree_map(lambda x: x if isinstance(x, jax.Array) else None, t)
+    right = jax.tree_util.tree_map(lambda x: None if isinstance(x, jax.Array) else x, t)
+    return left, right
+
+
+def unpartition_arrays(left, right):
+    jax.tree_util.tree_map(lambda l, r: l or r, left, right)
+
+
+def dropout(x, key, p):
+    q = 1 - jax.lax.stop_gradient(p)
+    mask = jr.bernoulli(key, q, x.shape)
+    return jnp.where(mask, x / q, 0)
+
+
+def layer_norm(x, epsilon):
+    mean = jnp.mean(x, keepdims=True)
+    variance = jnp.var(x, keepdims=True)
+    variance = jnp.maximum(0.0, variance)
+    inv = jax.lax.rsqrt(variance + epsilon)
+    return (x - mean) * inv
