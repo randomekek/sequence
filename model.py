@@ -1,8 +1,11 @@
+# %%
 import inspect
+import jax
 
 # Keep it elementary: jax.Array, list[model]
 # Use params and code flow: seq, linear, affine, residual
 # Use functions: layer norm, dropout
+
 
 def model(fn):
     signature = inspect.signature(fn)
@@ -21,9 +24,10 @@ def model(fn):
         return fn(x, **vars(self))
     def repr(self):
         return fn.__name__ + str(vars(self))
-    def flatten(self):
-        return ((k, getattr(self, k)) for k in field_names)
-    def unflatten(items):
-        return cls(**{k: v for k, v in items})
     cls = type(fn.__name__, (), {"__init__": init, "__call__": call, "__repr__": repr})
+    def flatten(self):
+        return (tuple(getattr(self, k) for k in field_names), None)
+    def unflatten(_, items):
+        return cls(**{k: v for k, v in zip(field_names, items)})
+    jax.tree_util.register_pytree_node(cls, flatten, unflatten)
     return cls
