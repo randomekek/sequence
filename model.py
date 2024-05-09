@@ -3,40 +3,47 @@ import inspect
 import jax
 import jax.numpy as jnp
 
-# Keep it elementary: jax.Array, list[model]
-# Use params and code flow: seq, linear, affine, residual
-# Use functions: layer norm, dropout
-# Use model: when you need list[model]
-
-# TODO: random & list init, dropout (random key, inference)
+# Use jax.Array: linear, affine, bias
+# Use code: seq, residual
+# Use parameters: prngkey
+# Use functions: layer norm, dropout, init
+# Use @model: top level, and list[model]
 
 
 def model(fn):
-    compiled = jax.jit(fn)
-    signature = inspect.signature(fn)
-    field_iter = iter(signature.parameters.items())
-    first_field = next(field_iter)
-    field_names = [k for k, v in field_iter]
+    parameters = list(inspect.signature(fn).parameters.items())
+    fields = [k for k, v in parameters if v.annotation not in (bool, int, float)]
+    static = [k for k, v in parameters if v.annotation in (bool, int, float)]
+    all_fields_set = set(fields + static)
     def init(self, **kwargs):
-        for f in field_names:
+        excess = set(kwargs.keys()) - all_fields_set
+        if excess:
+            raise TypeError(f'{fn.__name__} does not have parameter: {excess}')
+        for f in all_fields_set:
             setattr(self, f, kwargs.get(f))
-    def validate(kwargs):
-        missing = [f for f, v in kwargs.items() if v is None]
-        if missing:
-            raise TypeError(f'{fn.__name__} missing field: {" ".join(missing)}')
-    def call(self, x, **kwargs):
-        kwargs = vars(self) | kwargs
-        validate(kwargs)
-        return compiled(x, **kwargs)
+    def check_arguments(args, kwargs):
+        for arg, (k, v) in zip(args, parameters):
+            if kwargs[k] is not None:
+                raise TypeError(f'{fn.__name__} duplicate parameter: {k}')
+            kwargs[k] = arg
+        for k, v in kwargs.items():
+            if v is None:
+                raise TypeError(f'{fn.__name__} missing parameter: {k}')
+        return kwargs
+    def call(self, *args, **kwargs):
+        return fn(**check_arguments(args, vars(self) | kwargs))
     def repr(self):
-        return fn.__name__ + str(vars(self))
+        out = [fn.__name__ + ' {']
+        for k, v in jax.tree_util.tree_flatten_with_path(self)[0]:
+            out.append(' {} = {}'.format(jax.tree_util.keystr(k), getattr(v, 'shape', None) or str(v)))
+        return '\n'.join(out) + '\n}'
     cls = type(fn.__name__, (), {"__init__": init, "__call__": call, "__repr__": repr})
     def flatten(self):
-        return ((k, getattr(self, k)) for k in field_names), None
+        return ((jax.tree_util.GetAttrKey(k), getattr(self, k)) for k in fields), (getattr(self, k) for k in static)
     def flatten_fast(self):
-        return (getattr(self, k) for k in field_names), None
-    def unflatten(_, items):
-        return cls(**{k: v for k, v in zip(field_names, items)})
+        return (getattr(self, k) for k in fields), (getattr(self, k) for k in static)
+    def unflatten(static_items, field_items):
+        return cls(**{k: v for k, v in zip(fields, field_items)}, **{k: v for k, v in zip(static, static_items)})
     jax.tree_util.register_pytree_with_keys(cls, flatten, unflatten, flatten_fast)
     return cls
 
@@ -56,18 +63,6 @@ class Initializer(object):
     def map(self, num, fn):
         self.key, *keys = jax.random.split(self.key, num + 1)
         return [fn(Initializer(x)) for x in keys]
-
-
-def partition_arrays(t):
-    left = jax.tree_util.tree_map(lambda x: x if isinstance(x, jax.Array) else None, t)
-    right = jax.tree_util.tree_map(lambda x: None if isinstance(x, jax.Array) else x, t)
-    return left, right
-
-
-def unpartition(left, right):
-    merge = lambda l, r: l or r
-    is_none = lambda x: x is None
-    return jax.tree_util.tree_map(merge, left, right, is_leaf=is_none)
 
 
 def dropout(x, key, p):
