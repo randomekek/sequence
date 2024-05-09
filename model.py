@@ -12,6 +12,7 @@ import jax.numpy as jnp
 
 
 def model(fn):
+    compiled = jax.jit(fn)
     signature = inspect.signature(fn)
     field_iter = iter(signature.parameters.items())
     first_field = next(field_iter)
@@ -26,15 +27,17 @@ def model(fn):
     def call(self, x, **kwargs):
         kwargs = vars(self) | kwargs
         validate(kwargs)
-        return fn(x, **kwargs)
+        return compiled(x, **kwargs)
     def repr(self):
         return fn.__name__ + str(vars(self))
     cls = type(fn.__name__, (), {"__init__": init, "__call__": call, "__repr__": repr})
     def flatten(self):
-        return (tuple(getattr(self, k) for k in field_names), None)
+        return ((k, getattr(self, k)) for k in field_names), None
+    def flatten_fast(self):
+        return (getattr(self, k) for k in field_names), None
     def unflatten(_, items):
         return cls(**{k: v for k, v in zip(field_names, items)})
-    jax.tree_util.register_pytree_node(cls, flatten, unflatten)
+    jax.tree_util.register_pytree_with_keys(cls, flatten, unflatten, flatten_fast)
     return cls
 
 
@@ -61,8 +64,10 @@ def partition_arrays(t):
     return left, right
 
 
-def unpartition_arrays(left, right):
-    jax.tree_util.tree_map(lambda l, r: l or r, left, right)
+def unpartition(left, right):
+    merge = lambda l, r: l or r
+    is_none = lambda x: x is None
+    return jax.tree_util.tree_map(merge, left, right, is_leaf=is_none)
 
 
 def dropout(x, key, p):
