@@ -2,7 +2,7 @@
 import inspect
 import jax
 import jax.numpy as jnp
-from jax.tree_util import GetAttrKey, keystr, register_pytree_node, register_pytree_with_keys, tree_flatten_with_path
+from jax.tree_util import keystr, register_pytree_with_keys, tree_leaves_with_path
 
 # Use jax.Array: linear, affine, bias
 # Use code: seq, residual
@@ -14,7 +14,7 @@ from jax.tree_util import GetAttrKey, keystr, register_pytree_node, register_pyt
 class Unset(object): pass
 
 
-register_pytree_node(Unset, lambda x: ((), ()), lambda x, y: Unset())
+register_pytree_with_keys(Unset, lambda x: ((), ()), lambda x, y: Unset())
 
 
 def model(fn):
@@ -32,7 +32,7 @@ def model(fn):
         return fn(*args, **vars(self), **kwargs)
     def repr(self):
         out = [f'{name} {{']
-        for k, v in tree_flatten_with_path(self)[0]:
+        for k, v in tree_leaves_with_path(self):
             out.append(f'\n {keystr(k)} = ')
             if isinstance(v, jax.Array):
                 out.append(f'{v.dtype}{list(v.shape)}')
