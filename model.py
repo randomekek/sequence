@@ -2,6 +2,7 @@
 import inspect
 import jax
 import jax.numpy as jnp
+from jax.tree_util import GetAttrKey, keystr, register_pytree_node, register_pytree_with_keys, tree_flatten_with_path
 
 # Use jax.Array: linear, affine, bias
 # Use code: seq, residual
@@ -14,36 +15,44 @@ class Unset(object):
     pass
 
 
-jax.tree_util.register_pytree_node(Unset, lambda x: ((), ()), lambda x, y: Unset())
+register_pytree_node(Unset, lambda x: ((), ()), lambda x, y: Unset())
 
 
 def model(fn):
-    parameters = list(inspect.signature(fn).parameters.items())
-    fields = [k for k, v in parameters if v.annotation not in (bool, int, float)]
-    static = [k for k, v in parameters if v.annotation in (bool, int, float)]
+    name = fn.__name__
+    params = list(inspect.signature(fn).parameters.items())
+    fields = [k for k, v in params if v.annotation not in (bool, int, float)]
+    static = [k for k, v in params if v.annotation in (bool, int, float)]
     all_fields_set = set(fields + static)
+    field_names = list(map(GetAttrKey, fields))
     def init(self, **kwargs):
         for k in set(kwargs.keys()) - all_fields_set:
-            raise TypeError(f'{fn.__name__}() got an unexpected keyword argument: {k}')
-        for k in all_fields_set:
-            setattr(self, k, kwargs.get(k, Unset()))
-    def remove_unset(kwargs):
-        return {k: v for k, v in kwargs.items() if not isinstance(v, Unset)}
+            raise TypeError(f'{name}() got an unexpected keyword argument: {k}')
+        for k, v in kwargs.items():
+            setattr(self, k, v)
     def call(self, *args, **kwargs):
-        return fn(*args, **remove_unset(vars(self) | kwargs))
+        return fn(*args, **vars(self), **kwargs)
     def repr(self):
-        out = [fn.__name__ + ' {']
-        for k, v in jax.tree_util.tree_flatten_with_path(self)[0]:
-            out.append(' {} = {}'.format(jax.tree_util.keystr(k), getattr(v, 'shape', None) or str(v)))
-        return '\n'.join(out) + '\n}'
-    cls = type(fn.__name__, (), {"__init__": init, "__call__": call, "__repr__": repr})
+        out = [f'{name} {{']
+        for k, v in tree_flatten_with_path(self)[0]:
+            out.append(f'\n {keystr(k)} = ')
+            if isinstance(v, jax.Array):
+                out.append(f'{v.dtype}{list(v.shape)}')
+            else:
+                out.append(v)
+        return ''.join(out + ['\n}'])
+    cls = type(name, (), {"__init__": init, "__call__": call, "__repr__": repr})
+    def pack(self, ks):
+        return tuple(getattr(self, k, Unset()) for k in ks)
     def flatten(self):
-        return tuple((jax.tree_util.GetAttrKey(k), getattr(self, k)) for k in fields), tuple(getattr(self, k) for k in static)
+        return tuple(zip(field_names, pack(self, fields))), pack(self, static)
     def flatten_fast(self):
-        return tuple(getattr(self, k) for k in fields), tuple(getattr(self, k) for k in static)
-    def unflatten(static_items, field_items):
-        return cls(**{k: v for k, v in zip(fields, field_items)}, **{k: v for k, v in zip(static, static_items)})
-    jax.tree_util.register_pytree_with_keys(cls, flatten, unflatten, flatten_fast)
+        return pack(self, fields), pack(self, static)
+    def unpack(ks, vs):
+        return {k: v for k, v in zip(ks, vs) if not isinstance(v, Unset)}
+    def unflatten(svs, fvs):
+        return cls(**unpack(static, svs), **unpack(fields, fvs))
+    register_pytree_with_keys(cls, flatten, unflatten, flatten_fast)
     return cls
 
 
