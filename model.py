@@ -41,7 +41,7 @@ def model(fn):
         return ''.join(out + ['\n}'])
     cls = type(name, (), {"__init__": init, "__call__": call, "__repr__": repr})
     # hacks: static fields are flattened for repr, but are ignored for unflatten
-    flat_names = list(map(lambda x: f'.{x}', fields)) + list(map(lambda x: f'.{x} (static)', static))
+    flat_names = [f'.{k}' for k in fields] + [f'.{k} (static)' for k in static]
     def pack(self, ks):
         return tuple(getattr(self, k, Unset()) for k in ks)
     def flatten(self):
