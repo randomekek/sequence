@@ -11,7 +11,8 @@ from jax.tree_util import keystr, register_pytree_with_keys, tree_leaves_with_pa
 # Use @model: top level, and list[model]
 
 
-class Unset(object): pass
+class Unset(object):
+    pass
 
 
 register_pytree_with_keys(Unset, lambda x: ((), ()), lambda x, y: Unset())
@@ -34,7 +35,7 @@ def model(fn):
         out = [f'{name} {{']
         for k, v in tree_leaves_with_path(self):
             out.append(f'\n {keystr(k)} = ')
-            out.append(f'{v.dtype}{list(v.shape)}' if v is jax.Array else str(v))
+            out.append(f'{v.dtype}{list(v.shape)}' if isinstance(v, jax.Array) else str(v))
         return ''.join(out + ['\n}'])
     cls = type(name, (), {"__init__": init, "__call__": call, "__repr__": repr})
     # hacks: static fields are flattened for repr, but are ignored for unflatten
