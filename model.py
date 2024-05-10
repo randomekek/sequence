@@ -11,8 +11,7 @@ from jax.tree_util import GetAttrKey, keystr, register_pytree_node, register_pyt
 # Use @model: top level, and list[model]
 
 
-class Unset(object):
-    pass
+class Unset(object): pass
 
 
 register_pytree_node(Unset, lambda x: ((), ()), lambda x, y: Unset())
@@ -23,10 +22,9 @@ def model(fn):
     params = list(inspect.signature(fn).parameters.items())
     fields = [k for k, v in params if v.annotation not in (bool, int, float)]
     static = [k for k, v in params if v.annotation in (bool, int, float)]
-    all_fields_set = set(fields + static)
-    field_names = list(map(GetAttrKey, fields))
+    all_fields = fields + static
     def init(self, **kwargs):
-        for k in set(kwargs.keys()) - all_fields_set:
+        for k in set(kwargs.keys()) - set(all_fields):
             raise TypeError(f'{name}() got an unexpected keyword argument: {k}')
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -39,15 +37,17 @@ def model(fn):
             if isinstance(v, jax.Array):
                 out.append(f'{v.dtype}{list(v.shape)}')
             else:
-                out.append(v)
+                out.append(str(v))
         return ''.join(out + ['\n}'])
     cls = type(name, (), {"__init__": init, "__call__": call, "__repr__": repr})
+    # hacks: static fields are flattened for repr, but are ignored for unflatten
+    flat_names = list(map(lambda x: f'.{x}', fields)) + list(map(lambda x: f'.{x} (static)', static))
     def pack(self, ks):
         return tuple(getattr(self, k, Unset()) for k in ks)
     def flatten(self):
-        return tuple(zip(field_names, pack(self, fields))), pack(self, static)
+        return tuple(zip(flat_names, pack(self, all_fields))), pack(self, static)
     def flatten_fast(self):
-        return pack(self, fields), pack(self, static)
+        return pack(self, all_fields), pack(self, static)
     def unpack(ks, vs):
         return {k: v for k, v in zip(ks, vs) if not isinstance(v, Unset)}
     def unflatten(svs, fvs):
