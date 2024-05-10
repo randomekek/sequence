@@ -65,9 +65,9 @@ class Initializer(object):
         self.key, key = jax.random.split(self.key)
         return jax.nn.initializers.glorot_normal()(key, shape)
 
-    def map(self, num, fn):
-        self.key, *keys = jax.random.split(self.key, num + 1)
-        return [fn(Initializer(x)) for x in keys]
+    def map(self, fns):
+        self.key, *keys = jax.random.split(self.key, len(fns) + 1)
+        return [fn(Initializer(key)) for fn, key in zip(fns, keys)]
 
 
 def dropout(x, key, p):
