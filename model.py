@@ -38,7 +38,7 @@ def model(fn):
             if isinstance(v, jax.Array):
                 out.append(f'{v.dtype}{list(v.shape)}')
             else:
-                out.append(repr(v))
+                out.append(repr(v).replace('\n', '\n  '))
         return ''.join(out + ['\n}'])
     cls = type(name, (), {"__init__": init, "__call__": call, "__repr__": rep})
     flat_names = [GetAttrKey(k) for k in fields]
