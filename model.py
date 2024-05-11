@@ -2,7 +2,7 @@
 import inspect
 import jax
 import jax.numpy as jnp
-from jax.tree_util import keystr, register_pytree_with_keys, tree_leaves_with_path
+from jax.tree_util import GetAttrKey, register_pytree_with_keys
 
 # Use jax.Array: linear, affine, bias
 # Use code: seq, residual
@@ -23,29 +23,31 @@ def model(fn):
     params = list(inspect.signature(fn).parameters.items())
     fields = [k for k, v in params if v.annotation not in (bool, int, float)]
     static = [k for k, v in params if v.annotation in (bool, int, float)]
-    all_fields = fields + static
+    all_fields = set(fields + static)
     def init(self, **kwargs):
-        for k in set(kwargs.keys()) - set(all_fields):
+        for k in set(kwargs.keys()) - all_fields:
             raise TypeError(f'{name}() got an unexpected keyword argument: {k}')
         for k, v in kwargs.items():
             setattr(self, k, v)
     def call(self, *args, **kwargs):
         return fn(*args, **vars(self), **kwargs)
-    def repr(self):
+    def rep(self):
         out = [f'{name} {{']
-        for k, v in tree_leaves_with_path(self):
-            out.append(f'\n {keystr(k)} = ')
-            out.append(f'{v.dtype}{list(v.shape)}' if isinstance(v, jax.Array) else str(v))
+        for k, v in vars(self).items():
+            out.append(f'\n {"static " if k in static else ""}{k} = ')
+            if isinstance(v, jax.Array):
+                out.append(f'{v.dtype}{list(v.shape)}')
+            else:
+                out.append(repr(v))
         return ''.join(out + ['\n}'])
-    cls = type(name, (), {"__init__": init, "__call__": call, "__repr__": repr})
-    # hacks: static fields are flattened for repr, but are ignored for unflatten
-    flat_names = [f'.{k}' for k in fields] + [f'.{k} (static)' for k in static]
+    cls = type(name, (), {"__init__": init, "__call__": call, "__repr__": rep})
+    flat_names = [GetAttrKey(k) for k in fields]
     def pack(self, ks):
         return tuple(getattr(self, k, Unset()) for k in ks)
     def flatten(self):
-        return tuple(zip(flat_names, pack(self, all_fields))), pack(self, static)
+        return tuple(zip(flat_names, pack(self, fields))), pack(self, static)
     def flatten_fast(self):
-        return pack(self, all_fields), pack(self, static)
+        return pack(self, fields), pack(self, static)
     def unpack(ks, vs):
         return {k: v for k, v in zip(ks, vs) if not isinstance(v, Unset)}
     def unflatten(svs, fvs):
