@@ -1,14 +1,7 @@
-# %%
 import inspect
 import jax
 import jax.numpy as jnp
 from jax.tree_util import GetAttrKey, register_pytree_with_keys
-
-# Use jax.Array: linear, affine, bias
-# Use code: seq, residual
-# Use parameters: prngkey
-# Use functions: layer norm, dropout, init
-# Use @model: top level, and list[model]
 
 
 class Unset(object):
@@ -18,7 +11,7 @@ class Unset(object):
 register_pytree_with_keys(Unset, lambda x: ((), ()), lambda x, y: Unset())
 
 
-def model(fn):
+def funtree(fn):
     name = fn.__name__
     params = list(inspect.signature(fn).parameters.items())
     fields = [k for k, v in params if v.annotation not in (bool, int, float)]
@@ -75,13 +68,15 @@ class Initializer(object):
 
 def dropout(x, key, p):
     q = 1 - jax.lax.stop_gradient(p)
-    mask = jax.random.bernoulli(key, q, x.shape)
-    return jnp.where(mask, x / q, 0)
+    return jnp.where(jax.random.bernoulli(key, q, x.shape), x / q, 0)
 
 
-def layer_norm(x, epsilon):
+def norm(x, eps=1e-5):
     mean = jnp.mean(x, keepdims=True)
-    variance = jnp.var(x, keepdims=True)
-    variance = jnp.maximum(0.0, variance)
-    inv = jax.lax.rsqrt(variance + epsilon)
-    return (x - mean) * inv
+    var = jnp.maximum(jnp.var(x, keepdims=True), 0.0)
+    return (x - mean) * jax.lax.rsqrt(var + eps)
+
+
+def rms_norm(x, eps=1e-5):
+    ms = jnp.mean(jnp.square(x), keepdims=True)
+    return x * jax.lax.rsqrt(ms + eps)
