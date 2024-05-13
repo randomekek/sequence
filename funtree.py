@@ -20,6 +20,8 @@ def funtree(fn):
     def init(self, **kwargs):
         for k in set(kwargs.keys()) - all_fields:
             raise TypeError(f'{name}() got an unexpected keyword argument: {k}')
+        for k in set(k for k, v in kwargs.items() if not isinstance(v, (jax.Array, list, tuple, dict))) & set(fields):
+            raise TypeError(f'{name}() got non array, non static argument: {k}')
         for k, v in kwargs.items():
             setattr(self, k, v)
     def call(self, *args, **kwargs):
@@ -50,11 +52,13 @@ def funtree(fn):
 
 
 def _add_init_methods(cls):
-    for m in ('glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform', 'normal', 'truncated_normal'):
-        def inner(self, shape, method=m, **kwargs):
+    def wrap_fn(method):
+        def inner(self, shape, *args, **kwargs):
             self.key, key = jax.random.split(self.key)
-            return getattr(jax.nn.initializers, method)(**kwargs)(key, shape)
-        setattr(cls, m, inner)
+            return getattr(jax.nn.initializers, method)(*args, **kwargs)(key, shape)
+        return inner
+    for m in ('glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform', 'normal', 'truncated_normal'):
+        setattr(cls, m, wrap_fn(m))
     return cls
 
 
