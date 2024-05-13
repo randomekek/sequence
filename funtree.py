@@ -49,17 +49,19 @@ def funtree(fn):
     return cls
 
 
+def _add_init_methods(cls):
+    for m in ('glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform', 'normal', 'truncated_normal'):
+        def inner(self, shape, method=m, **kwargs):
+            self.key, key = jax.random.split(self.key)
+            return getattr(jax.nn.initializers, method)(**kwargs)(key, shape)
+        setattr(cls, m, inner)
+    return cls
+
+
+@_add_init_methods
 class Initializer(object):
     def __init__(self, key):
         self.key = key
-
-    def normal(self, shape, stddev):
-        self.key, key = jax.random.split(self.key)
-        return jax.nn.initializers.normal(stddev)(key, shape)
-
-    def golorot_normal(self, shape):
-        self.key, key = jax.random.split(self.key)
-        return jax.nn.initializers.glorot_normal()(key, shape)
 
     def map(self, fns):
         self.key, *keys = jax.random.split(self.key, len(fns) + 1)
