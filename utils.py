@@ -35,7 +35,8 @@ CONST_LIST = {}
 def run_const(fn):
     code = inspect.getsource(fn)
     if code not in CONST_LIST:
-        print(f'eval: {fn.__name__}')
+        name = fn.__name__ if fn.__name__ != '<lambda>' else code
+        print(f'eval: {name}')
         CONST_LIST[code] = fn()
     return CONST_LIST[code]
 
@@ -50,17 +51,18 @@ def optimize(model, opt_state, update, accuracy_fn):
     print('starting')
     t = datetime.datetime.now()
     displayed = 0
+    keys = jax.random.split(jax.random.PRNGKey(0), 10000)
     try:
-        for b in range(10000):
-            loss, model, opt_state = update(b, model, opt_state)
+        for b, key in zip(range(10000), keys):
+            loss, model, opt_state = update(key, model, opt_state)
             if b < 1 or (datetime.datetime.now() - t).total_seconds() > 5.0:
                 log(f'{displayed:02d} {b:04d} {loss:.3e} ', end='')
-                log(f'{accuracy_fn(model)*100:0.1f}%')
+                log(f'{accuracy_fn(model, key)*100:0.1f}%')
                 t = datetime.datetime.now()
                 displayed += 1
     except KeyboardInterrupt:
         print('interrupt')
 
-    log(f'xx {b:04d} accuracy {accuracy_fn(model)*100:0.1f}% (done)')
+    log(f'xx {b:04d} accuracy {accuracy_fn(model, keys[0])*100:0.1f}% (done)')
 
     return model, opt_state
