@@ -54,13 +54,13 @@ def main():
                 qkv=init.glorot_normal([embedding, 3*heads*embedding]),
                 out=init.glorot_normal([heads*embedding, embedding]),
                 heads=heads,
-                dropout_p=0.5,
+                dropout_p=0.1,
             )
         def make_mlp(init):
             return Mlp(
                 up=init.glorot_normal([embedding, up*embedding]),
                 down=init.glorot_normal([up*embedding, embedding]),
-                dropout_p=0.5,
+                dropout_p=0.1,
             )
         return GPT(
             embedding=init.normal([vocab, embedding], 1),
@@ -104,26 +104,43 @@ def main():
     @jax.jit
     def update_with_task(x, y, model, opt_state, key):
         loss, grads = jax.value_and_grad(loss_fn)(model, x, y, key)
-        updates, opt_state = optimizer.update(grads, opt_state)
+        updates, opt_state = optimizer.update(grads, opt_state, model)
         model = optax.apply_updates(model, updates)
         return loss, model, opt_state
 
-    batch_size = 30
-    seq_length = 100
-    model = init_gpt_model(vocab=39, embedding=256, heads=12, layer_count=8, up=4, max_length=102)
-    optimizer = optax.adam(3e-4)  # needs to be lower for more complex models
+    batch_size = 64
+    seq_length = 128
+    model = init_gpt_model(vocab=39, embedding=256, heads=6, layer_count=6, up=4, max_length=seq_length)
+    scheduler = optax.warmup_cosine_decay_schedule(
+        init_value=0, peak_value=3e-4, warmup_steps=40, decay_steps=400, end_value=1e-4)
+    optimizer = optax.chain(
+        optax.clip_by_global_norm(1.0),
+        optax.scale_by_adam(0.9, 0.99),
+        optax.add_decayed_weights(0.1),  # TODO: add mask for non matmul
+        optax.scale_by_schedule(scheduler),
+        optax.scale(-1)
+    )
     opt_state = optimizer.init(model)
     accuracy_set = tasks(key=jax.random.PRNGKey(-1))
 
-    if True:
+    mode = 'LEARN'
+
+    if mode == 'LEARN':
         return utils.optimize(model, opt_state, update, accuracy_fn(accuracy_set))
-    else:
-        del model
-        k = jax.random.PRNGKey(43)
-        task = tasks(k)[0][0]
-        print(as_text(task))
-        print(' ' + as_text(jnp.argmax(final_model(task, k), axis=-1)))
-        return final_model, final_opt_state
+    elif mode == 'PRED':
+        for a in range(25):
+            k = jax.random.PRNGKey(a)
+            task = tasks(k)[0][0]
+            print(as_text(task))
+            print(' ' + as_text(jnp.argmax(final_model(task, k), axis=-1)))
+    elif mode == 'GEN':
+        x = jnp.array([15])
+        k = jax.random.PRNGKey(0)
+        for i in range(70):
+            next = jnp.argmax(final_model(x, k)[-1:, :], axis=-1)
+            x = jnp.concatenate([x, next])
+        print(as_text(x))
+    return final_model, final_opt_state
 
 
 final_model, final_opt_state = main()
