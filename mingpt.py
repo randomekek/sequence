@@ -1,6 +1,6 @@
 # %%
 from einops import einsum, rearrange
-from funtree import funtree, dropout, norm, rms_norm, Initializer
+from funtree import funmap, funtree, dropout, norm, rms_norm, Initializer, Update
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -111,12 +111,17 @@ def main():
     batch_size = 64
     seq_length = 128
     model = init_gpt_model(vocab=39, embedding=256, heads=6, layer_count=6, up=4, max_length=seq_length)
+    decay_mask = funmap(model, {
+        Attention: lambda **kw: Update(kw, qkv=True, out=True, key=False),
+        Mlp: lambda **kw: Update(kw, up=True, down=True, key=False),
+        GPT: lambda **kw: Update(kw, embedding=False, positional=False, unembed=False, key=False),
+    })
     scheduler = optax.warmup_cosine_decay_schedule(
         init_value=0, peak_value=3e-4, warmup_steps=40, decay_steps=400, end_value=1e-4)
     optimizer = optax.chain(
         optax.clip_by_global_norm(1.0),
         optax.scale_by_adam(0.9, 0.99),
-        optax.add_decayed_weights(0.1),  # TODO: add mask for non matmul
+        optax.add_decayed_weights(0.1),  # TODO: decay_mask callable has a different meaning
         optax.scale_by_schedule(scheduler),
         optax.scale(-1)
     )
