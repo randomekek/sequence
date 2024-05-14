@@ -121,7 +121,7 @@ def main():
     optimizer = optax.chain(
         optax.clip_by_global_norm(1.0),
         optax.scale_by_adam(0.9, 0.99),
-        optax.add_decayed_weights(0.1),  # TODO: decay_mask callable has a different meaning
+        optax.add_decayed_weights(0.1, lambda x: decay_mask),
         optax.scale_by_schedule(scheduler),
         optax.scale(-1)
     )
