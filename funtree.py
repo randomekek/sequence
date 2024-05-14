@@ -20,8 +20,6 @@ def funtree(fn):
     def init(self, **kwargs):
         for k in set(kwargs.keys()) - all_fields:
             raise TypeError(f'{name}() got an unexpected keyword argument: {k}')
-        for k in set(k for k, v in kwargs.items() if not isinstance(v, (jax.Array, list, tuple, dict))) & set(fields):
-            raise TypeError(f'{name}() got non array, non static argument: {k}')
         for k, v in kwargs.items():
             setattr(self, k, v)
     def call(self, *args, **kwargs):
