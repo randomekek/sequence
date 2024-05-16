@@ -66,3 +66,7 @@ def optimize(model, opt_state, update, accuracy_fn):
     log(f'xx {b:04d} accuracy {accuracy_fn(model, keys[0])*100:0.1f}% (done)')
 
     return model, opt_state
+
+
+def param_count(model):
+    return sum(x.size for x in jax.tree_util.tree_leaves(model))
