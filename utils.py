@@ -8,16 +8,17 @@ DIR = 'logs/'
 
 def run(fn, description):
     filename = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
-    output = fn()
+    outputs = fn()
     filename = f'{DIR}{filename}.py'
     log = ''
-    if output and 'log' in output:
-        log = f'\n\n{output["log"]}'
+    for param in outputs:
+        if type(param) == dict and 'log' in param:
+            log = f'\n\n{param["log"]}'
     with open(filename, 'x') as code:
         code.write(f'"""\n{description}{log}\n"""\n\n{inspect.getsource(fn)}')
     with open(f'log.txt', 'a+') as summary:
         summary.write(f'===\n{filename}\n\n{description}\n\n')
-    return output
+    return outputs
 
 
 def split_shape(key, shape):
@@ -65,7 +66,7 @@ def optimize(model, opt_state, update, accuracy_fn):
 
     log(f'xx {b:04d} accuracy {accuracy_fn(model, keys[0])*100:0.1f}% (done)')
 
-    return model, opt_state
+    return model, opt_state, {'logs': logs}
 
 
 def param_count(model):
