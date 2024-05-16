@@ -269,3 +269,11 @@ logs/20231030-215927.py
 
 try DLN using character level 256 way softmax
 
+===
+logs/20240516-230614.py
+
+train ComputeGate, an alternative to MLP
+
+ComputeGate = down(gate * compute)
+MLP = down(up)
+
