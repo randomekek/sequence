@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from jax.tree_util import GetAttrKey, register_pytree_with_keys
 
 
-class Unset(object):
+class Unset:
     pass
 
 
@@ -79,7 +79,7 @@ def _add_init_methods(cls):
 
 
 @_add_init_methods
-class Initializer(object):
+class Initializer:
     def __init__(self, key):
         self.key = key
 
