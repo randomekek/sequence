@@ -9,7 +9,6 @@ class Unset:
 
 
 register_pytree_with_keys(Unset, lambda x: ((), ()), lambda x, y: Unset())
-_funtree_registry = set()
 
 
 def funtree(fn):
@@ -35,7 +34,6 @@ def funtree(fn):
                 out.append(repr(v).replace('\n', '\n  '))
         return ''.join(out + ['\n}'])
     cls = type(name, (), {"__init__": init, "__call__": call, "__repr__": rep})
-    _funtree_registry.add(cls)
     flat_names = [GetAttrKey(k) for k in fields]
     def pack(self, ks):
         return tuple(getattr(self, k, Unset()) for k in ks)
@@ -53,7 +51,7 @@ def funtree(fn):
 
 def funmap(tree, mapfns):
     cls = type(tree)
-    if cls in _funtree_registry:
+    if cls in mapfns.keys():
         return cls(**mapfns[cls](**{k: funmap(v, mapfns) for k, v in vars(tree).items()}))
     elif cls in (list, tuple):
         return cls(funmap(x, mapfns) for x in tree)
