@@ -61,10 +61,6 @@ def funmap(tree, mapfns):
         return tree
 
 
-def Update(kw, **kwargs):
-    return kw | kwargs
-
-
 def _add_init_methods(cls):
     def wrap_fn(method):
         def inner(self, shape, *args, **kwargs):
