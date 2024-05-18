@@ -26,16 +26,19 @@ class OutputLogger:
 def run(fn, description):
     root = pathlib.Path('logs')
     now = lambda fmt: datetime.datetime.now().strftime(fmt)
-    folder = root.joinpath(pathlib.Path(now('%Y%m')))
-    filename = folder.joinpath(pathlib.Path(now('%Y%m%d-%H%M%S') + '.py'))
+    folder = root.joinpath(now('%Y%m'))
     folder.mkdir(exist_ok=True)
+    code_filename = folder.joinpath(now('%Y%m%d-%H%M%S') + '.py')
+    blob_filename = folder.joinpath(now('%Y%m%d-%H%M%S') + '.blob')
     with open(f'log.txt', 'a+') as summary:
-        summary.write(f'===\n{filename}\n\n{description}\n\n')
-    with open(filename, 'x') as code_file:
+        summary.write(f'===\n{code_filename}\n\n{description}\n\n')
+    with open(code_filename, 'x') as code_file:
         code_file.write(f'"""\n{description}\n"""\n\n{inspect.getsource(fn)}\n\n"""\n')
         with OutputLogger(code_file):
             outputs = fn()
         code_file.write('"""\n')
+    with open(blob_filename, 'xb') as blob_file:
+        'TODO: save outputs to blob_file'
     return outputs
 
 
@@ -61,12 +64,6 @@ def run_const(fn):
 
 
 def optimize(model, opt_state, update, accuracy_fn, iter_count=2000, seed=0):
-    logs = []
-
-    def log(text, end='\n'):
-        print(text, end=end)
-        logs.append(text + end)
-
     print('starting')
     t = datetime.datetime.now()
     displayed = 0
@@ -74,16 +71,16 @@ def optimize(model, opt_state, update, accuracy_fn, iter_count=2000, seed=0):
         for b, key in zipkey(range(iter_count), jax.random.PRNGKey(seed)):
             loss, model, opt_state = update(key, model, opt_state)
             if b < 1 or (datetime.datetime.now() - t).total_seconds() > 5.0:
-                log(f'{displayed:02d} {b:04d} {loss:.3e} ', end='')
-                log(f'{accuracy_fn(model, key)*100:0.1f}%')
+                print(f'{displayed:02d} {b:04d} {loss:.3e} ', end='')
+                print(f'{accuracy_fn(model, key)*100:0.1f}%')
                 t = datetime.datetime.now()
                 displayed += 1
     except KeyboardInterrupt:
         print('interrupt')
 
-    log(f'xx {b:04d} accuracy {accuracy_fn(model, jax.random.PRNGKey(0))*100:0.1f}% (done)')
+    print(f'xx {b:04d} accuracy {accuracy_fn(model, jax.random.PRNGKey(0))*100:0.1f}% (done)')
 
-    return model, opt_state, {'logs': ''.join(logs)}
+    return model, opt_state
 
 
 def param_count(model):
