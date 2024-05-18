@@ -1,26 +1,41 @@
 import datetime
-import equinox as eqx
 import inspect
 import pathlib
+import sys
 import jax
 
-DIR = 'logs/'
+
+class OutputLogger:
+    def __init__(self, log_file):
+        self.log_file = log_file
+        self.stdout, self.stderr = sys.stdout, sys.stderr
+
+    def __enter__(self):
+        sys.stdout, sys.stderr = self, self
+
+    def __exit__(self, type, value, traceback):
+        sys.stdout, sys.stderr = self.stdout, self.stderr
+
+    def __getattr__(self, name):
+        def inner(*args, **kwargs):
+            getattr(self.log_file, name)(*args, **kwargs)
+            return getattr(self.stdout, name)(*args, **kwargs)
+        return inner
 
 
 def run(fn, description):
-    folder = datetime.datetime.now().strftime('%Y%m')
-    filename = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
-    outputs = fn()
-    filename = f'{DIR}/{folder}/{filename}.py'
-    log = ''
-    for param in outputs:
-        if type(param) == dict and 'logs' in param:
-            log = '\n\n' + param['logs']
-    pathlib.Path(f'{DIR}/{folder}').mkdir(exist_ok=True)
-    with open(filename, 'x') as code:
-        code.write(f'"""\n{description}{log}\n"""\n\n{inspect.getsource(fn)}')
+    root = pathlib.Path('logs')
+    now = lambda fmt: datetime.datetime.now().strftime(fmt)
+    folder = root.joinpath(pathlib.Path(now('%Y%m')))
+    filename = folder.joinpath(pathlib.Path(now('%Y%m%d-%H%M%S') + '.py'))
+    folder.mkdir(exist_ok=True)
     with open(f'log.txt', 'a+') as summary:
         summary.write(f'===\n{filename}\n\n{description}\n\n')
+    with open(filename, 'x') as code_file:
+        code_file.write(f'"""\n{description}\n"""\n\n{inspect.getsource(fn)}\n\n"""\n')
+        with OutputLogger(code_file):
+            outputs = fn()
+        code_file.write('"""\n')
     return outputs
 
 
