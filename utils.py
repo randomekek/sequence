@@ -9,6 +9,7 @@ class OutputLogger:
     def __init__(self, log_file):
         self.log_file = log_file
         self.stdout, self.stderr = sys.stdout, sys.stderr
+        self.flush_time = datetime.datetime.now()
 
     def __enter__(self):
         sys.stdout, sys.stderr = self, self
@@ -19,6 +20,8 @@ class OutputLogger:
     def __getattr__(self, name):
         def inner(*args, **kwargs):
             getattr(self.log_file, name)(*args, **kwargs)
+            if (datetime.datetime.now() - self.flush_time).total_seconds() > 5.0:
+                self.log_file.flush()
             return getattr(self.stdout, name)(*args, **kwargs)
         return inner
 
@@ -33,6 +36,7 @@ def run(fn, description):
         summary.write(f'===\n{code_filename}\n\n{description}\n\n')
     with open(code_filename, 'x') as code_file:
         code_file.write(f'"""\n{description}\n"""\n\n{inspect.getsource(fn)}\n\n"""\n')
+        code_file.flush()
         with OutputLogger(code_file):
             outputs = fn()
         code_file.write('"""\n')
@@ -61,7 +65,6 @@ def run_const(fn):
 
 
 def optimize(model, opt_state, update, accuracy_fn, iter_count=2000, seed=0):
-    print('starting')
     t = datetime.datetime.now()
     displayed = 0
     try:
