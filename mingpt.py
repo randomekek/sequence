@@ -15,7 +15,7 @@ def main():
     import optax
     import utils
 
-    global Mlp, Swiglu, Attention, GPT
+    global Mlp, Swiglu, Attention, GPT, tasks
 
     @funtree
     def Mlp(x, key, up, down, dropout_p: float):
@@ -155,7 +155,7 @@ def main():
                 end_value=1e-4)),
             optax.scale(-1))
         opt_state = optimizer.init(model)
-        model, opt_state = utils.optimize(model, opt_state, update, accuracy_fn(accuracy_set), iter_count=2)
+        model, opt_state = utils.optimize(model, opt_state, update, accuracy_fn(accuracy_set), iter_count=300)
         outputs[name] = dict(model=model, opt_state=opt_state)
     return outputs
 
@@ -166,6 +166,7 @@ outputs = utils.run(main, 'computegate is called swiglu')
 
 meta = json.load(open('shakespeare_char/meta.json'))
 char_map = jnp.array([ord(c) for c in meta['chars']])
+model = outputs['linear']['model']
 
 
 def as_text(vals):
