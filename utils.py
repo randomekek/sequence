@@ -1,8 +1,8 @@
 import datetime
 import inspect
+import jax
 import pathlib
 import sys
-import jax
 
 
 class OutputLogger:
@@ -29,7 +29,6 @@ def run(fn, description):
     folder = root.joinpath(now('%Y%m'))
     folder.mkdir(exist_ok=True)
     code_filename = folder.joinpath(now('%Y%m%d-%H%M%S') + '.py')
-    blob_filename = folder.joinpath(now('%Y%m%d-%H%M%S') + '.blob')
     with open(f'log.txt', 'a+') as summary:
         summary.write(f'===\n{code_filename}\n\n{description}\n\n')
     with open(code_filename, 'x') as code_file:
@@ -37,8 +36,6 @@ def run(fn, description):
         with OutputLogger(code_file):
             outputs = fn()
         code_file.write('"""\n')
-    with open(blob_filename, 'xb') as blob_file:
-        'TODO: save outputs to blob_file'
     return outputs
 
 
