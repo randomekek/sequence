@@ -11,7 +11,7 @@ class Unset:
 register_pytree_with_keys(Unset, lambda x: ((), ()), lambda x, y: Unset())
 
 
-def funtree(fn):
+def makefun(fn):
     name = fn.__name__
     params = list(inspect.signature(fn).parameters.items())
     fields = [k for k, v in params if v.annotation not in (bool, int, float)]

@@ -7,7 +7,8 @@ import utils
 
 def main():
     from einops import einsum, rearrange, reduce
-    from funtree import funload, funmap, funsave, funtree, dropout, norm, rms_norm, Initializer
+    from funtree import dropout, norm, rms_norm
+    import funtree
     import jax
     import jax.numpy as jnp
     import jax.random as jr
@@ -17,7 +18,7 @@ def main():
 
     global Mlp, Swiglu, Attention, GPT, tasks
 
-    @funtree
+    @funtree.makefun
     def Mlp(x, key, up, down, dropout_p: float):
         x_norm = rms_norm(x)
         expanded = jax.nn.gelu(einsum(x_norm, up, 'L E, E U -> L U'))
@@ -25,7 +26,7 @@ def main():
         return dropout(lowered, key, dropout_p)
 
     # activation: id < gelu << sigmoid
-    @funtree
+    @funtree.makefun
     def Swiglu(x, key, gate_m, compute_m, down, expansion: int, dropout_p: float):
         x_norm = rms_norm(x)
         gate = jax.nn.swish(einsum(x_norm, gate_m, 'L E, E U -> L U'))
@@ -34,7 +35,7 @@ def main():
         merged = einsum(gate * compute, down, 'L U, U E -> L E')
         return dropout(merged, key, dropout_p)
 
-    @funtree
+    @funtree.makefun
     def Attention(x, key, qkv, out, heads: int, dropout_p: float):
         x_norm = rms_norm(x)
         parts = einsum(x_norm, qkv, 'L E, E HsplitD -> L HsplitD')
@@ -51,7 +52,7 @@ def main():
         output = einsum(gather, out, 'L Z, Z E -> L E')
         return output
 
-    @funtree
+    @funtree.makefun
     def GPT(x, key, embedding, positional, layers, unembed):
         L = x.shape[0]
         hidden = embedding[x] + positional[:L, :]
@@ -61,7 +62,7 @@ def main():
         return logits
 
     def init_gpt_model(vocab, embedding, heads, layer_count, expansion, max_length, use_swiglu):
-        init = Initializer(jax.random.PRNGKey(0))
+        init = funtree.Initializer(jax.random.PRNGKey(0))
         def make_attention(init):
             return Attention(
                 qkv=init.glorot_normal([embedding, 3 * heads * embedding]),
@@ -137,7 +138,7 @@ def main():
     outputs = {}
     for name, model in models.items():
         print(name)
-        decay_mask = funmap(model, {
+        decay_mask = funtree.funmap(model, {
             Attention: lambda **kw: dict(kw, qkv=True, out=True, key=False),
             Mlp: lambda **kw: dict(kw, up=True, down=True, key=False),
             Swiglu: lambda **kw: dict(kw, gate_m=True, compute_m=True, down=True, key=False),
