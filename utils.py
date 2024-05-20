@@ -1,6 +1,8 @@
 import datetime
 import inspect
 import jax
+import jax.numpy as jnp
+import msgpack
 import pathlib
 import sys
 
@@ -26,7 +28,10 @@ class OutputLogger:
         return inner
 
 
-def run(fn, description):
+def run(fn, description, record=True):
+    if not record:
+        print('NOT SAVING')
+        return fn()
     root = pathlib.Path('logs')
     now = lambda fmt: datetime.datetime.now().strftime(fmt)
     folder = root.joinpath(now('%Y%m'))
@@ -89,3 +94,39 @@ def param_count(model):
 
 def zipkey(items, key):
     return zip(items, jax.random.split(key, len(items)))
+
+
+def load_pytree(blob, classes=()):
+    class_dict = {c.__name__: c for c in [dict, list, tuple] + classes}
+    make_pytree = lambda node, childs: jax.tree_util.PyTreeDef.make_from_node_data_and_children(
+        jax.tree_util.default_registry, node, childs)
+    def unpack_array(x):
+        if isinstance(x, dict) and x.get('funtree') == 'jax.Array':
+            return jnp.reshape(jnp.frombuffer(x['bytes'], jnp.dtype(x['dtype'])), x['shape'])
+        return x
+    def unpack_pytree(obj):
+        if obj is None:
+            return make_pytree(None, [])
+        cls = class_dict[obj['name']]
+        return make_pytree((cls, obj['datas']), [unpack_pytree(x) for x in obj['childs']])
+    obj = msgpack.unpackb(blob)
+    leaves = [unpack_array(x) for x in obj['leaves']]
+    pytree = unpack_pytree(obj['pytree'])
+    return jax.tree_util.tree_unflatten(pytree, leaves)
+
+
+def save_pytree(tree):
+    leaves, pytree = jax.tree_util.tree_flatten(tree)
+    def pack_array(x):
+        if isinstance(x, jax.Array):
+            return dict(funtree='jax.Array', bytes=x.tobytes(), dtype=str(x.dtype), shape=x.shape)
+        return x
+    def pack_pytree(treedef: jax.tree_util.PyTreeDef):
+        data = treedef.node_data()
+        if not data:
+            return None
+        return dict(name=data[0].__name__, datas=data[1], childs=[pack_pytree(x) for x in treedef.children()])
+    return msgpack.packb({
+        'leaves': [pack_array(x) for x in leaves],
+        'pytree': pack_pytree(pytree),
+    })
