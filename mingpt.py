@@ -137,7 +137,7 @@ def main():
     }
     outputs = {}
     for name, model in models.items():
-        print(name)
+        print(f'{name} params: {utils.param_count(model):,}')
         decay_mask = funtree.funmap(model, {
             Attention: lambda **kw: dict(kw, qkv=True, out=True, key=False),
             Mlp: lambda **kw: dict(kw, up=True, down=True, key=False),
