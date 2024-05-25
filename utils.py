@@ -72,13 +72,17 @@ def run_const(fn):
 def optimize(model, opt_state, update, accuracy_fn, iter_count=2000, seed=0):
     t = datetime.datetime.now()
     displayed = 0
+    last = 0
     try:
         for b, key in zipkey(range(iter_count), jax.random.PRNGKey(seed)):
             loss, model, opt_state = update(key, model, opt_state)
-            if b < 1 or (datetime.datetime.now() - t).total_seconds() > 5.0:
-                print(f'{displayed:02d} {b:04d} {loss:.3e} ', end='')
+            spent = (datetime.datetime.now() - t).total_seconds()
+            if b < 1 or spent > 5.0:
+                speed = (b - last) / spent
+                print(f'{displayed:02d} {b:04d} {float(loss):.3e} {speed:.1f}it/s ', end='')
                 print(f'{accuracy_fn(model, key)*100:0.1f}%')
                 t = datetime.datetime.now()
+                last = b
                 displayed += 1
     except KeyboardInterrupt:
         print('interrupt')
