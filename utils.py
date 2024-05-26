@@ -137,3 +137,11 @@ def save_pytree(tree):
         'leaves': [pack_array(x) for x in leaves],
         'pytree': pack_pytree(pytree),
     })
+
+
+def cast_pytree(tree, dtype):
+    def replace(x):
+        if isinstance(x, jax.Array):
+            return x.astype(dtype)
+        return x
+    return jax.tree_util.tree_map(replace, tree)
