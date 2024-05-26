@@ -37,6 +37,7 @@ def run(fn, description, record=True):
     folder = root.joinpath(now('%Y%m'))
     folder.mkdir(exist_ok=True)
     code_filename = folder.joinpath(now('%Y%m%d-%H%M%S') + '.py')
+    print(f'run logging to: {code_filename}')
     with open(f'log.txt', 'a+') as summary:
         summary.write(f'===\n{code_filename}\n\n{description}\n\n')
     with open(code_filename, 'x') as code_file:
@@ -73,6 +74,7 @@ def optimize(model, opt_state, update, accuracy_fn, iter_count=2000, seed=0):
     t = datetime.datetime.now()
     displayed = 0
     last = 0
+    key_zero = jax.random.PRNGKey(0)
     try:
         for b, key in zipkey(range(iter_count), jax.random.PRNGKey(seed)):
             loss, model, opt_state = update(key, model, opt_state)
@@ -87,7 +89,8 @@ def optimize(model, opt_state, update, accuracy_fn, iter_count=2000, seed=0):
     except KeyboardInterrupt:
         print('interrupt')
 
-    print(f'xx {b:04d} accuracy {accuracy_fn(model, jax.random.PRNGKey(0))*100:0.1f}% (done)')
+    loss, unused_model, unused_opt_state = update(key_zero, model, opt_state)
+    print(f'xx {b:04d} {float(loss):.3e} accuracy {accuracy_fn(model, key_zero)*100:0.1f}% (done)')
 
     return model, opt_state
 
