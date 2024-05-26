@@ -277,3 +277,17 @@ train ComputeGate, an alternative to MLP
 ComputeGate = down(gate * compute)
 MLP = down(up)
 
+===
+journal 2024-05-25
+
+Compared to AllanYangZhou/midGPT, which is much faster time and iters:
+- training speed: use bfloat16 for grad, use float32 for accumulate
+  - float16 vs bfloat16 roughly the same speed and loss
+  - casted up to float32 for the softmax operation
+- be careful about layernorm - which dimension does it norm over
+- attention needs scaling by 1/sqrt(D) (i used E)
+- embedding needs to be scaled by 1/sqrt(E) - i just used jr.normal
+  seems to make initial iterations faster, not much effect later
+- additional differences i haven't implemented yet
+  qk layernorm has weights
+  rope embedding
