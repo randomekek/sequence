@@ -8,6 +8,9 @@ class Unset:
     pass
 
 
+UNSET = Unset()
+
+
 register_pytree_with_keys(Unset, lambda x: ((), ()), lambda x, y: Unset())
 
 
@@ -36,7 +39,7 @@ def makefun(fn):
     cls = type(name, (), {"__init__": init, "__call__": call, "__repr__": rep})
     flat_names = [GetAttrKey(k) for k in fields]
     def pack(self, ks):
-        return tuple(getattr(self, k, Unset()) for k in ks)
+        return tuple(getattr(self, k, UNSET) for k in ks)
     def flatten(self):
         return tuple(zip(flat_names, pack(self, fields))), pack(self, static)
     def flatten_fast(self):
@@ -80,6 +83,10 @@ class Initializer:
     def map(self, fns):
         self.key, *keys = jax.random.split(self.key, len(fns) + 1)
         return [fn(Initializer(key)) for fn, key in zip(fns, keys)]
+
+    def split(self):
+        self.key, key = jax.random.split(self.key)
+        return key
 
 
 def dropout(x, key, p):
