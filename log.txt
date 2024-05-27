@@ -291,3 +291,13 @@ Compared to AllanYangZhou/midGPT, which is much faster time and iters:
 - additional differences i haven't implemented yet
   qk layernorm has weights
   rope embedding
+
+===
+journal 2024-05-28
+- norms seem ok, i updated to use 1e-6 rather than 1e-5
+- it seems like initialization matters
+  - he: 1/sqrt(2*in) <-- 1.07 at iter 2500
+  - minGPT: 1/sqrt(in) <-- 0.94 at iter 2500
+  - glorot: 1/sqrt(avg) <-- 0.94 at iter 2500
+  - need to check if it matters for attention, combine or mlp.
+    i think it's affecting combine, because he == glorot for attention part
