@@ -94,12 +94,12 @@ def dropout(x, key, p):
     return jnp.where(jax.random.bernoulli(key, q, x.shape), x / q, 0)
 
 
-def norm(x, eps=1e-5):
+def norm(x, eps=1e-6):
     mean = jnp.mean(x, keepdims=True)
     var = jnp.maximum(jnp.var(x, keepdims=True), 0.0)
     return (x - mean) * jax.lax.rsqrt(var + eps)
 
 
-def rms_norm(x, eps=1e-5):
+def rms_norm(x, eps=1e-6):
     ms = jnp.mean(jnp.square(x), keepdims=True)
     return x * jax.lax.rsqrt(ms + eps)
