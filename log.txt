@@ -301,3 +301,7 @@ journal 2024-05-28
   - glorot: 1/sqrt(avg) <-- 0.94 at iter 2500
   - need to check if it matters for attention, combine or mlp.
     i think it's affecting combine, because he == glorot for attention part
+- can do multiple updates in a jit update block, seems maybe 20% faster in wall time
+  however it would require a differentiable data set
+- the embedding scaling is SUPER critical to fast learning, not sure why
+- need to study initialization more
