@@ -63,7 +63,7 @@ def run_const(fn):
     return CONST_LIST[code]
 
 
-def optimize(model, opt_state, update, accuracy_fn, iter_count=2000, seed=0):
+def optimize(model, opt_state, update, eval=lambda *k: '', iter_count=2000, seed=0):
     t = datetime.datetime.now()
     displayed = 0
     last = 0
@@ -75,7 +75,7 @@ def optimize(model, opt_state, update, accuracy_fn, iter_count=2000, seed=0):
             if b < 1 or spent > 5.0:
                 speed = (b - last) / spent
                 print(f'{displayed:02d} {b:04d} {float(loss):.3e} {speed:.1f}it/s ', end='')
-                print(f'{accuracy_fn(model, key)*100:0.1f}%')
+                print(eval(model, key_zero))
                 t = datetime.datetime.now()
                 last = b
                 displayed += 1
@@ -83,7 +83,7 @@ def optimize(model, opt_state, update, accuracy_fn, iter_count=2000, seed=0):
         print('interrupt')
 
     loss, unused_model, unused_opt_state = update(key_zero, model, opt_state)
-    print(f'xx {b:04d} {float(loss):.3e} accuracy {accuracy_fn(model, key_zero)*100:0.1f}% (done)')
+    print(f'xx {b:04d} {float(loss):.3e} {eval(model, key_zero)} (done)')
 
     return model, opt_state
 

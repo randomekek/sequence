@@ -89,16 +89,6 @@ def main():
         offset = jnp.arange(seq_length)[None, :]
         return (data[start + offset], data[start + offset + 1])
 
-    def accuracy_fn(batch):  # ([B, L], [B, L])
-        return lambda x, y: 0
-        x, y = batch
-        def fn(model, key):
-            keys = jr.split(key, x.shape[0])
-            logits = jax.vmap(model)(x, keys)
-            prediction = jnp.argmax(logits, axis=-1)  # argmax(softmax(x)) == argmax(x) - softmax preserves max
-            return jnp.mean(prediction == y, axis=(0, 1))
-        return jax.jit(fn)
-
     def loss_fn(model, x, y, key):  # model, [B, L], [B, L]
         logits = jax.vmap(model)(x, jr.split(key, x.shape[0]))  # [B, L, C]
         return jnp.mean(optax.softmax_cross_entropy_with_integer_labels(logits, y))
@@ -118,7 +108,6 @@ def main():
 
     batch_size = 64
     seq_length = 256
-    accuracy_set = tasks(key=jax.random.PRNGKey(-1))
     base_params = dict(seq_length=seq_length, layer_count=6, embed_size=384, heads=6,
                        vocab=65, dropout_p=0.2, qkv_scale=0.1, emb_scale=0.03)
     models = {
@@ -139,7 +128,7 @@ def main():
                 end_value=1e-4)),
             optax.scale(-1))
         opt_state = optimizer.init(model)
-        model, opt_state = utils.optimize(model, opt_state, update, accuracy_fn(accuracy_set), iter_count=2500)
+        model, opt_state = utils.optimize(model, opt_state, update, iter_count=2500)
         outputs[name] = dict(model=model, opt_state=opt_state)
     return outputs
 
