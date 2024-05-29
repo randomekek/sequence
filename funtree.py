@@ -4,14 +4,12 @@ import jax.numpy as jnp
 from jax.tree_util import GetAttrKey, register_pytree_with_keys
 
 
+@jax.tree_util.register_static
 class Unset:
     pass
 
 
 UNSET = Unset()
-
-
-register_pytree_with_keys(Unset, lambda x: ((), ()), lambda x, y: Unset())
 
 
 def makefun(fn):
@@ -64,29 +62,13 @@ def funmap(tree, mapfns):
         return tree
 
 
-def _add_init_methods(cls):
-    def wrap_fn(method):
-        def inner(self, shape, *args, **kwargs):
-            self.key, key = jax.random.split(self.key)
-            return getattr(jax.nn.initializers, method)(*args, **kwargs)(key, shape)
-        return inner
-    for m in ('glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform', 'normal', 'truncated_normal'):
-        setattr(cls, m, wrap_fn(m))
-    return cls
-
-
-@_add_init_methods
 class Initializer:
-    def __init__(self, key):
-        self.key = key
-
-    def map(self, fns):
-        self.key, *keys = jax.random.split(self.key, len(fns) + 1)
-        return [fn(Initializer(key)) for fn, key in zip(fns, keys)]
-
-    def split(self):
-        self.key, key = jax.random.split(self.key)
-        return key
+    def __init__(self, key): self.key = key
+    def split(self): self.key, key = jax.random.split(self.key); return key
+    def glorot_normal(self, shape): return jax.nn.initializers.glorot_normal()(self.split(), shape)
+    def he_normal(self, shape): return jax.nn.initializers.he_normal()(self.split(), shape)
+    def normal(self, shape): return jax.random.normal(self.split(), shape)
+    def map(self, fns): return [fn(Initializer(key)) for fn, key in zipkey(fns, self.split())]
 
 
 def dropout(x, key, p):
@@ -103,3 +85,7 @@ def norm(x, eps=1e-6):
 def rms_norm(x, eps=1e-6):
     ms = jnp.mean(jnp.square(x), keepdims=True)
     return x * jax.lax.rsqrt(ms + eps)
+
+
+def zipkey(items, key):
+    return zip(items, jax.random.split(key, len(items)))
