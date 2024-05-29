@@ -305,3 +305,15 @@ journal 2024-05-28
   however it would require a differentiable data set
 - the embedding scaling is SUPER critical to fast learning, not sure why
 - need to study initialization more
+
+===
+journal 20240528
+checking init scale hyperparameters
+- glorot is optimal for matrix: 0.5 vs 1.0 seems similar, 0.1 and 2.0 are worse
+- qkv scale: 0.1 seems to be the best, only just slightly
+- positional scale: doesn't matter
+- embedding scale: tiny is ok, ~1 is not ok
+- learning: when training model start with glorot, and tune across scales, when using plain normal, make it tiny
+- TODO: gradient, weight and activation visualization
+
+
