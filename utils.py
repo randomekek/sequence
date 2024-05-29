@@ -6,6 +6,8 @@ import msgpack
 import pathlib
 import sys
 
+SCALES = [0.003, 0.01, 0.03, 0.1, 0.3, 1., 3.]
+
 
 class OutputLogger:
     def __init__(self, log_file):
@@ -47,15 +49,6 @@ def run(fn, description, record=True):
             outputs = fn()
         code_file.write('"""\n')
     return outputs
-
-
-def split_shape(key, shape):
-    if isinstance(shape, (tuple, list)):
-        return tuple(split_shape(k, s) for (k, s) in zip(jax.random.split(key, len(shape)), shape))
-    elif shape == 0:
-        return key
-    else:
-        return jax.random.split(key, shape)
 
 
 CONST_LIST = {}
@@ -145,3 +138,12 @@ def cast_pytree(tree, dtype):
             return x.astype(dtype)
         return x
     return jax.tree_util.tree_map(replace, tree)
+
+
+class StopExecution(Exception):
+    def _render_traceback_(self): return ['terminated']
+
+
+def print_dtypes(vars):
+    print('\n'.join(f'{k}: {v.dtype}{v.shape}' for k, v in vars.items() if hasattr(v, 'shape')))
+    raise StopExecution()
