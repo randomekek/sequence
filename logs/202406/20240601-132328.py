@@ -1,9 +1,6 @@
-# %%
-import jax
-import jax.numpy as jnp
-import json
-import utils
-
+"""
+compare with midGPT
+"""
 
 def main():
     from einops import einsum, rearrange, reduce
@@ -111,10 +108,8 @@ def main():
     batch_size = 64
     seq_length = 256
     base_params = dict(seq_length=seq_length, layer_count=6, embed_size=384, heads=6,
-                       vocab=65, dropout_p=0.2, qk_scale=0.1, emb_scale=0.03, v_scale=0.01)
-    models = {
-        'base': init_gpt(**base_params),
-    }
+                       vocab=65, dropout_p=0.2, qk_scale=0.1, emb_scale=0.03)
+    models = {f'v_scale: {s}': init_gpt(**base_params, v_scale=s) for s in utils.SCALES}
     outputs = {}
     for name, model in models.items():
         print(f'config: {name}')
@@ -141,31 +136,68 @@ def main():
     return outputs
 
 
-outputs = utils.run(main, 'compare with midGPT')
-
-# %%
-
-meta = json.load(open('shakespeare_char/meta.json'))
-char_map = jnp.array([ord(c) for c in meta['chars']])
-model = outputs['linear']['model']
-
-
-def as_text(vals):
-    return ''.join(chr(c) for c in char_map[vals]).replace('\n', '¶')
-
-
-def predict():
-    for a in range(25):
-        k = jax.random.PRNGKey(a)
-        task = tasks(k)[0][0]
-        print(as_text(task))
-        print(' ' + as_text(jnp.argmax(model(task, k), axis=-1)))
-
-
-def generate():
-    x = jnp.array([15])
-    k = jax.random.PRNGKey(0)
-    for i in range(70):
-        next = jnp.argmax(model(x, k)[-1:, :], axis=-1)
-        x = jnp.concatenate([x, next])
-    print(as_text(x))
+"""
+config: v_scale: 0.003
+00 0000 4.406e+00 0.0it/s 
+01 0039 2.703e+00 7.8it/s 
+02 0079 2.516e+00 7.8it/s 
+03 0118 2.312e+00 7.8it/s 
+04 0157 2.125e+00 7.7it/s 
+05 0196 2.000e+00 7.7it/s 
+06 0234 1.906e+00 7.5it/s 
+xx 0249 1.914e+00  (done)
+config: v_scale: 0.01
+00 0000 4.406e+00 0.0it/s 
+01 0040 2.703e+00 7.9it/s 
+02 0080 2.516e+00 7.8it/s 
+03 0120 2.344e+00 7.9it/s 
+04 0160 2.109e+00 7.8it/s 
+05 0199 2.016e+00 7.8it/s 
+06 0238 1.891e+00 7.8it/s 
+xx 0249 1.898e+00  (done)
+config: v_scale: 0.03
+00 0000 4.406e+00 0.0it/s 
+01 0040 2.703e+00 7.8it/s 
+02 0079 2.500e+00 7.7it/s 
+03 0119 2.281e+00 7.8it/s 
+04 0158 2.094e+00 7.8it/s 
+05 0197 2.016e+00 7.7it/s 
+06 0236 1.945e+00 7.6it/s 
+xx 0249 1.906e+00  (done)
+config: v_scale: 0.1
+00 0000 4.406e+00 0.0it/s 
+01 0040 2.750e+00 7.8it/s 
+02 0079 2.516e+00 7.7it/s 
+03 0118 2.469e+00 7.7it/s 
+04 0157 2.234e+00 7.7it/s 
+05 0196 2.047e+00 7.7it/s 
+06 0235 1.969e+00 7.7it/s 
+xx 0249 1.953e+00  (done)
+config: v_scale: 0.3
+00 0000 4.438e+00 0.0it/s 
+01 0040 2.891e+00 7.8it/s 
+02 0079 2.531e+00 7.8it/s 
+03 0118 2.484e+00 7.8it/s 
+04 0157 2.469e+00 7.8it/s 
+05 0197 2.328e+00 7.8it/s 
+06 0236 2.078e+00 7.8it/s 
+xx 0249 2.047e+00  (done)
+config: v_scale: 1.0
+00 0000 4.562e+00 0.0it/s 
+01 0039 2.969e+00 7.8it/s 
+02 0078 2.562e+00 7.7it/s 
+03 0118 2.484e+00 7.8it/s 
+04 0157 2.453e+00 7.8it/s 
+05 0196 2.344e+00 7.8it/s 
+06 0236 2.141e+00 7.8it/s 
+xx 0249 2.109e+00  (done)
+config: v_scale: 3.0
+00 0000 5.000e+00 0.0it/s 
+01 0040 2.984e+00 7.9it/s 
+02 0080 2.609e+00 7.8it/s 
+03 0120 2.594e+00 7.9it/s 
+04 0160 2.484e+00 7.9it/s 
+05 0199 2.359e+00 7.8it/s 
+06 0239 2.219e+00 7.8it/s 
+xx 0249 2.203e+00  (done)
+"""

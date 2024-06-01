@@ -318,3 +318,14 @@ checking init scale hyperparameters
 - TODO: gradient, weight and activation visualization
 
 
+===
+logs/202406/20240601-131606.py
+
+verify splitting qkv
+
+===
+logs/202406/20240601-132328.py
+
+run hyperparameters on v_scale
+- looks like v_scale smaller is better, under 0.3 makes no difference
+
