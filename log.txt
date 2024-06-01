@@ -314,6 +314,7 @@ checking init scale hyperparameters
 - positional scale: doesn't matter
 - embedding scale: tiny is ok, ~1 is not ok
 - learning: when training model start with glorot, and tune across scales, when using plain normal, make it tiny
+- weight decay doesn't seem to do much
 - TODO: gradient, weight and activation visualization
 
 

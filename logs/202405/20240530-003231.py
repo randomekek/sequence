@@ -1,9 +1,6 @@
-# %%
-import jax
-import jax.numpy as jnp
-import json
-import utils
-
+"""
+compare with midGPT
+"""
 
 def main():
     from einops import einsum, rearrange, reduce
@@ -139,31 +136,70 @@ def main():
     return outputs
 
 
-outputs = utils.run(main, 'compare with midGPT')
-
-# %%
-
-meta = json.load(open('shakespeare_char/meta.json'))
-char_map = jnp.array([ord(c) for c in meta['chars']])
-model = outputs['linear']['model']
-
-
-def as_text(vals):
-    return ''.join(chr(c) for c in char_map[vals]).replace('\n', '¶')
-
-
-def predict():
-    for a in range(25):
-        k = jax.random.PRNGKey(a)
-        task = tasks(k)[0][0]
-        print(as_text(task))
-        print(' ' + as_text(jnp.argmax(model(task, k), axis=-1)))
-
-
-def generate():
-    x = jnp.array([15])
-    k = jax.random.PRNGKey(0)
-    for i in range(70):
-        next = jnp.argmax(model(x, k)[-1:, :], axis=-1)
-        x = jnp.concatenate([x, next])
-    print(as_text(x))
+"""
+config: base
+00 0000 4.344e+00 0.0it/s 
+01 0040 2.781e+00 8.0it/s 
+02 0080 2.516e+00 8.0it/s 
+03 0121 2.375e+00 8.0it/s 
+04 0161 2.156e+00 8.0it/s 
+05 0201 2.031e+00 8.0it/s 
+06 0241 1.945e+00 8.0it/s 
+07 0281 1.883e+00 8.0it/s 
+08 0321 1.797e+00 7.9it/s 
+09 0361 1.750e+00 8.0it/s 
+10 0401 1.672e+00 8.0it/s 
+11 0441 1.594e+00 8.0it/s 
+12 0481 1.547e+00 7.9it/s 
+13 0521 1.531e+00 8.0it/s 
+14 0561 1.477e+00 8.0it/s 
+15 0601 1.445e+00 7.9it/s 
+16 0641 1.469e+00 8.0it/s 
+17 0681 1.430e+00 7.9it/s 
+18 0721 1.406e+00 7.9it/s 
+19 0761 1.375e+00 7.9it/s 
+20 0801 1.352e+00 8.0it/s 
+21 0841 1.328e+00 8.0it/s 
+22 0881 1.273e+00 7.9it/s 
+23 0921 1.281e+00 7.9it/s 
+24 0961 1.305e+00 7.9it/s 
+25 1001 1.281e+00 8.0it/s 
+26 1041 1.250e+00 7.9it/s 
+27 1081 1.227e+00 7.9it/s 
+28 1121 1.234e+00 8.0it/s 
+29 1161 1.227e+00 7.9it/s 
+30 1201 1.242e+00 7.9it/s 
+31 1241 1.234e+00 7.9it/s 
+32 1281 1.195e+00 7.9it/s 
+33 1321 1.164e+00 7.8it/s 
+34 1361 1.141e+00 7.8it/s 
+35 1401 1.102e+00 7.8it/s 
+36 1441 1.078e+00 7.8it/s 
+37 1481 1.094e+00 7.8it/s 
+38 1521 1.070e+00 7.9it/s 
+39 1561 1.047e+00 7.8it/s 
+40 1601 1.055e+00 7.8it/s 
+41 1641 1.047e+00 7.8it/s 
+42 1681 1.070e+00 7.9it/s 
+43 1721 1.047e+00 7.8it/s 
+44 1761 9.961e-01 7.8it/s 
+45 1801 1.000e+00 7.9it/s 
+46 1841 1.031e+00 7.8it/s 
+47 1881 9.688e-01 7.9it/s 
+48 1921 9.375e-01 7.9it/s 
+49 1961 9.453e-01 7.9it/s 
+50 2001 9.102e-01 8.0it/s 
+51 2041 9.297e-01 7.9it/s 
+52 2081 8.984e-01 7.9it/s 
+53 2121 8.945e-01 8.0it/s 
+54 2161 8.555e-01 7.9it/s 
+55 2201 8.633e-01 7.8it/s 
+56 2241 8.867e-01 7.9it/s 
+57 2281 8.398e-01 8.0it/s 
+58 2321 7.930e-01 7.9it/s 
+59 2361 8.125e-01 7.9it/s 
+60 2401 8.320e-01 8.0it/s 
+61 2441 8.008e-01 7.9it/s 
+62 2481 8.398e-01 7.9it/s 
+xx 2499 7.852e-01  (done)
+"""
