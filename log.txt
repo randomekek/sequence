@@ -329,3 +329,23 @@ logs/202406/20240601-132328.py
 run hyperparameters on v_scale
 - looks like v_scale smaller is better, under 0.3 makes no difference
 
+===
+logs/202406/20240601-145309.py
+
+try out DLN + fixed sliding window attention
+- it seems to not fail, but it's quite slow
+
+===
+logs/202406/20240601-152117.py
+
+use associative_scan to make it faster (from 3.7 -> 6.9 it/s)
+
+also try setting size to 1
+- for some reason setting size -> 1 makes it very slow
+- turns out somehow i'm making it float32 instead of bfloat16
+- now i just create a zeros matrix of the right dtype
+- turns out with 5 history, attention can get the same loss as full history
+  - history = 2 is quite similar (bigrams)
+  - history = 1 seems to not progress
+
+

@@ -1,14 +1,6 @@
-# %%
-from einops import einsum, rearrange, reduce, repeat
-from funtree import dropout, norm, rms_norm
-import funtree
-import jax
-import jax.numpy as jnp
-import jax.random as jr
-import json
-import optax
-import utils
-
+"""
+compare with midGPT
+"""
 
 def main():
     from einops import einsum, rearrange, reduce, repeat
@@ -31,8 +23,6 @@ def main():
     @funtree.makefun
     def DLN(x, key, update_proj, input_proj, dropout_p: float):
         # update_proj: P, input_proj: E P, returns L P
-        # Disable DLN:
-        # return jnp.zeros([x.shape[0], update_proj.shape[0]], dtype=jnp.bfloat16)
         x_norm = jax.vmap(rms_norm)(x)
         vals = einsum(x_norm, input_proj, 'L E, E P -> L P')
         L, P = vals.shape
@@ -47,7 +37,7 @@ def main():
         result = dropout(result, key, dropout_p)
         return result
 
-    @funtree.makefun
+    @ funtree.makefun
     def Attention(x, key, qk_proj, v_proj, out, history_len: int, heads: int, dropout_p: float):
         x_norm = jax.vmap(rms_norm)(x)
         parts = einsum(x_norm, qk_proj, 'L E, E splitHD -> L splitHD')
@@ -68,7 +58,7 @@ def main():
         output = dropout(output, key2, dropout_p)
         return output
 
-    @funtree.makefun
+    @ funtree.makefun
     def Block(x, key, attn, mlp, dln):
         dln_key, attn_key, mlp_key = jr.split(key, 3)
         h = dln(x, key=dln_key)
@@ -76,7 +66,7 @@ def main():
         x = x + mlp(x, key=mlp_key)
         return x
 
-    @funtree.makefun
+    @ funtree.makefun
     def GPT(x, key, embedding, positional, layers, unembed):
         L = x.shape[0]
         hidden = embedding[x] + positional[:L, :]
@@ -130,7 +120,7 @@ def main():
         x, y = tasks(task_key)
         return update_with_task(x, y, model, opt_state, model_key)
 
-    @jax.jit
+    @ jax.jit
     def update_with_task(x, y, model, opt_state, key):
         model_bfloat16 = utils.cast_pytree(model, jnp.bfloat16)
         loss, grads = jax.value_and_grad(loss_fn)(model_bfloat16, x, y, key)
@@ -143,7 +133,7 @@ def main():
     base_params = dict(seq_length=seq_length, layer_count=6, embed_size=384, heads=6,
                        vocab=65, dropout_p=0.2, qk_scale=0.1, emb_scale=0.03, v_scale=0.01)
     models = {
-        'base': init_gpt(**base_params, dln_size=1000, history_len=1),
+        'base': init_gpt(**base_params, dln_size=100, history_len=5),
     }
     outputs = {}
     for name, model in models.items():
@@ -160,36 +150,85 @@ def main():
                 end_value=1e-4)),
             optax.scale(-1))
         opt_state = optimizer.init(model)
-        model, opt_state = utils.optimize(model, opt_state, update, iter_count=250)
+        model, opt_state = utils.optimize(model, opt_state, update, iter_count=2500)
         outputs[name] = dict(model=model, opt_state=opt_state)
     return outputs
 
 
-outputs = utils.run(main, 'set the history down to 1')
-
-# %%
-
-meta = json.load(open('shakespeare_char/meta.json'))
-char_map = jnp.array([ord(c) for c in meta['chars']])
-model = outputs['linear']['model']
-
-
-def as_text(vals):
-    return ''.join(chr(c) for c in char_map[vals]).replace('\n', '¶')
-
-
-def predict():
-    for a in range(25):
-        k = jax.random.PRNGKey(a)
-        task = tasks(k)[0][0]
-        print(as_text(task))
-        print(' ' + as_text(jnp.argmax(model(task, k), axis=-1)))
-
-
-def generate():
-    x = jnp.array([15])
-    k = jax.random.PRNGKey(0)
-    for i in range(70):
-        next = jnp.argmax(model(x, k)[-1:, :], axis=-1)
-        x = jnp.concatenate([x, next])
-    print(as_text(x))
+"""
+config: base
+00 0000 4.406e+00 0.0it/s 
+01 0035 2.844e+00 6.9it/s 
+02 0070 2.406e+00 7.0it/s 
+03 0105 2.125e+00 7.0it/s 
+04 0140 1.930e+00 6.9it/s 
+05 0175 1.789e+00 6.9it/s 
+06 0210 1.680e+00 6.9it/s 
+07 0245 1.602e+00 6.9it/s 
+08 0280 1.555e+00 6.9it/s 
+09 0315 1.570e+00 6.9it/s 
+10 0350 1.500e+00 6.9it/s 
+11 0385 1.445e+00 6.9it/s 
+12 0420 1.469e+00 6.9it/s 
+13 0455 1.445e+00 6.9it/s 
+14 0490 1.398e+00 6.9it/s 
+15 0525 1.375e+00 6.8it/s 
+16 0560 1.391e+00 6.8it/s 
+17 0595 1.336e+00 6.8it/s 
+18 0630 1.359e+00 6.8it/s 
+19 0665 1.320e+00 6.8it/s 
+20 0700 1.289e+00 6.8it/s 
+21 0735 1.266e+00 6.8it/s 
+22 0770 1.234e+00 6.8it/s 
+23 0805 1.266e+00 6.8it/s 
+24 0840 1.281e+00 6.8it/s 
+25 0875 1.266e+00 6.8it/s 
+26 0910 1.250e+00 6.8it/s 
+27 0945 1.203e+00 6.8it/s 
+28 0980 1.227e+00 6.8it/s 
+29 1015 1.211e+00 6.8it/s 
+30 1050 1.227e+00 6.8it/s 
+31 1084 1.203e+00 6.8it/s 
+32 1119 1.195e+00 6.9it/s 
+33 1154 1.180e+00 6.8it/s 
+34 1189 1.195e+00 6.9it/s 
+35 1224 1.195e+00 6.9it/s 
+36 1259 1.172e+00 6.8it/s 
+37 1294 1.133e+00 6.8it/s 
+38 1329 1.125e+00 6.8it/s 
+39 1364 1.117e+00 6.9it/s 
+40 1399 1.125e+00 6.8it/s 
+41 1434 1.102e+00 6.8it/s 
+42 1468 1.086e+00 6.8it/s 
+43 1502 1.094e+00 6.7it/s 
+44 1536 1.094e+00 6.8it/s 
+45 1571 1.117e+00 6.8it/s 
+46 1605 1.109e+00 6.7it/s 
+47 1639 1.070e+00 6.6it/s 
+48 1673 1.070e+00 6.7it/s 
+49 1707 1.062e+00 6.7it/s 
+50 1741 1.070e+00 6.8it/s 
+51 1775 1.070e+00 6.7it/s 
+52 1809 1.016e+00 6.7it/s 
+53 1843 1.008e+00 6.7it/s 
+54 1877 1.078e+00 6.6it/s 
+55 1911 1.000e+00 6.8it/s 
+56 1946 1.055e+00 6.8it/s 
+57 1981 9.922e-01 6.9it/s 
+58 2016 1.016e+00 6.8it/s 
+59 2051 9.883e-01 6.9it/s 
+60 2086 9.531e-01 6.9it/s 
+61 2120 9.727e-01 6.8it/s 
+62 2154 9.844e-01 6.8it/s 
+63 2188 9.531e-01 6.8it/s 
+64 2222 9.805e-01 6.8it/s 
+65 2256 9.258e-01 6.8it/s 
+66 2290 9.414e-01 6.8it/s 
+67 2324 8.984e-01 6.8it/s 
+68 2358 8.984e-01 6.8it/s 
+69 2392 9.414e-01 6.8it/s 
+70 2426 8.984e-01 6.8it/s 
+71 2460 8.359e-01 6.8it/s 
+72 2494 8.750e-01 6.8it/s 
+xx 2499 8.867e-01  (done)
+"""

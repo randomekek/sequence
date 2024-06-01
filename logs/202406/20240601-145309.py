@@ -1,17 +1,9 @@
-# %%
-from einops import einsum, rearrange, reduce, repeat
-from funtree import dropout, norm, rms_norm
-import funtree
-import jax
-import jax.numpy as jnp
-import jax.random as jr
-import json
-import optax
-import utils
-
+"""
+compare with midGPT
+"""
 
 def main():
-    from einops import einsum, rearrange, reduce, repeat
+    from einops import einsum, rearrange, reduce
     from funtree import dropout, norm, rms_norm
     import funtree
     import jax
@@ -31,19 +23,13 @@ def main():
     @funtree.makefun
     def DLN(x, key, update_proj, input_proj, dropout_p: float):
         # update_proj: P, input_proj: E P, returns L P
-        # Disable DLN:
-        # return jnp.zeros([x.shape[0], update_proj.shape[0]], dtype=jnp.bfloat16)
         x_norm = jax.vmap(rms_norm)(x)
         vals = einsum(x_norm, input_proj, 'L E, E P -> L P')
         L, P = vals.shape
-        updates = repeat(update_proj, 'P -> L P', L=L)
-        pairs = jnp.stack([updates, vals])
-        def inner(a, b):
-            pa, va = a
-            pb, vb = b
-            return jnp.stack([pa * pb, va * pb + vb])
-        result = jax.lax.associative_scan(inner, pairs, axis=1)  # L 2 P
-        result = result[0, :, :]
+        def inner(state, value):
+            next_state = state * update_proj + value
+            return next_state, next_state
+        unused_final, result = jax.lax.scan(inner, jnp.zeros([P]), vals)
         result = dropout(result, key, dropout_p)
         return result
 
@@ -143,7 +129,7 @@ def main():
     base_params = dict(seq_length=seq_length, layer_count=6, embed_size=384, heads=6,
                        vocab=65, dropout_p=0.2, qk_scale=0.1, emb_scale=0.03, v_scale=0.01)
     models = {
-        'base': init_gpt(**base_params, dln_size=1000, history_len=1),
+        'base': init_gpt(**base_params, dln_size=100, history_len=20),
     }
     outputs = {}
     for name, model in models.items():
@@ -165,31 +151,21 @@ def main():
     return outputs
 
 
-outputs = utils.run(main, 'set the history down to 1')
-
-# %%
-
-meta = json.load(open('shakespeare_char/meta.json'))
-char_map = jnp.array([ord(c) for c in meta['chars']])
-model = outputs['linear']['model']
-
-
-def as_text(vals):
-    return ''.join(chr(c) for c in char_map[vals]).replace('\n', '¶')
-
-
-def predict():
-    for a in range(25):
-        k = jax.random.PRNGKey(a)
-        task = tasks(k)[0][0]
-        print(as_text(task))
-        print(' ' + as_text(jnp.argmax(model(task, k), axis=-1)))
-
-
-def generate():
-    x = jnp.array([15])
-    k = jax.random.PRNGKey(0)
-    for i in range(70):
-        next = jnp.argmax(model(x, k)[-1:, :], axis=-1)
-        x = jnp.concatenate([x, next])
-    print(as_text(x))
+"""
+config: base
+00 0000 4.398e+00 0.0it/s 
+01 0020 3.145e+00 3.8it/s 
+02 0039 2.703e+00 3.8it/s 
+03 0058 2.552e+00 3.7it/s 
+04 0077 2.474e+00 3.7it/s 
+05 0096 2.353e+00 3.7it/s 
+06 0115 2.298e+00 3.7it/s 
+07 0134 2.187e+00 3.7it/s 
+08 0153 2.081e+00 3.7it/s 
+09 0172 1.978e+00 3.7it/s 
+10 0191 1.912e+00 3.7it/s 
+11 0210 1.825e+00 3.7it/s 
+12 0229 1.771e+00 3.7it/s 
+13 0248 1.705e+00 3.7it/s 
+xx 0249 1.708e+00  (done)
+"""
