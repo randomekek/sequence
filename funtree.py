@@ -69,6 +69,7 @@ class Initializer:
     def he_normal(self, shape): return jax.nn.initializers.he_normal()(self.split(), shape)
     def normal(self, shape): return jax.random.normal(self.split(), shape)
     def map(self, fns): return [fn(Initializer(key)) for fn, key in zipkey(fns, self.split())]
+    def uniform(self, shape, min, max): return jax.random.uniform(self.split(), shape, minval=min, maxval=max)
 
 
 def dropout(x, key, p):
