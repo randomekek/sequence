@@ -348,4 +348,3 @@ also try setting size to 1
   - history = 2 is quite similar (bigrams)
   - history = 1 seems to not progress
 
-

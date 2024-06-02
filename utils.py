@@ -3,6 +3,7 @@ import inspect
 import jax
 import jax.numpy as jnp
 import msgpack
+import os
 import pathlib
 import sys
 
@@ -21,11 +22,14 @@ class OutputLogger:
     def __exit__(self, type, value, traceback):
         sys.stdout, sys.stderr = self.stdout, self.stderr
 
+    def write(self, *args, **kwargs):
+        self.log_file.write(*args, **kwargs)
+        self.log_file.flush()
+        return self.stdout.write(*args, **kwargs)
+
     def __getattr__(self, name):
         def inner(*args, **kwargs):
             getattr(self.log_file, name)(*args, **kwargs)
-            if (datetime.datetime.now() - self.flush_time).total_seconds() > 5.0:
-                self.log_file.flush()
             return getattr(self.stdout, name)(*args, **kwargs)
         return inner
 
@@ -40,14 +44,24 @@ def run(fn, description, record=True):
     folder.mkdir(exist_ok=True)
     code_filename = folder.joinpath(now('%Y%m%d-%H%M%S') + '.py')
     print(f'run logging to: {code_filename}')
+    start_time = datetime.datetime.now()
+    def cleanup():
+        if (datetime.datetime.now() - start_time).total_seconds() < 10:
+            print('** NOT SAVING **')
+            os.unlink(code_filename)
+    try:
+        with open(code_filename, 'x') as code_file:
+            code_file.write(f'"""\n{description}\n"""\n\n{inspect.getsource(fn)}\n\n"""\n')
+            code_file.flush()
+            with OutputLogger(code_file):
+                outputs = fn()
+            code_file.write('"""\n')
+    except Exception as e:
+        cleanup()
+        raise e
+    cleanup()
     with open(f'log.txt', 'a+') as summary:
-        summary.write(f'===\n{code_filename}\n\n{description}\n\n')
-    with open(code_filename, 'x') as code_file:
-        code_file.write(f'"""\n{description}\n"""\n\n{inspect.getsource(fn)}\n\n"""\n')
-        code_file.flush()
-        with OutputLogger(code_file):
-            outputs = fn()
-        code_file.write('"""\n')
+        summary.write(f'\n===\n{code_filename}\n\n{description}\n')
     return outputs
 
 
