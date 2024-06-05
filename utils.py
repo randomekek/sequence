@@ -46,7 +46,7 @@ def run(fn, description, record=True):
     print(f'run logging to: {code_filename}')
     start_time = datetime.datetime.now()
     def cleanup():
-        if (datetime.datetime.now() - start_time).total_seconds() < 10:
+        if (datetime.datetime.now() - start_time).total_seconds() < 30:
             print('** NOT SAVING **')
             os.unlink(code_filename)
     try:
@@ -82,6 +82,7 @@ def optimize(model, opt_state, update, eval=lambda *k: '', iter_count=2000, seed
     displayed = 0
     last = 0
     key_zero = jax.random.PRNGKey(0)
+    interrupted = False
     try:
         for b, key in zipkey(range(iter_count), jax.random.PRNGKey(seed)):
             loss, model, opt_state = update(key, model, opt_state)
@@ -95,11 +96,12 @@ def optimize(model, opt_state, update, eval=lambda *k: '', iter_count=2000, seed
                 displayed += 1
     except KeyboardInterrupt:
         print('interrupt')
+        interrupted = True
 
     loss, unused_model, unused_opt_state = update(key_zero, model, opt_state)
     print(f'xx {b:04d} {float(loss):.3e} {eval(model, key_zero)} (done)')
 
-    return model, opt_state
+    return model, opt_state, interrupted
 
 
 def param_count(model):
