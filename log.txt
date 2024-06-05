@@ -348,3 +348,38 @@ also try setting size to 1
   - history = 2 is quite similar (bigrams)
   - history = 1 seems to not progress
 
+
+===
+logs/202406/20240605-183134.py
+
+test if we can replace gelu with relu
+
+===
+logs/202406/20240605-183626.py
+
+test if we can replace gelu with relu, and he_normal
+- he normal is slightly worse! even though it's a relu
+
+===
+logs/202406/20240605-204752.py
+
+test if we can replace gelu with near linear options:
+- relu: 0.8
+- relu (he): 0.95
+- x - 2.5*tanh(x): 1.1
+- x - 1.5*tanh(x): 1.0
+- x - 0.9*tanh(x): 1.25
+- x - 0.5*tanh(x): 1.5
+- leaky relu 0.98: 1.57
+- x + tanh(x): 1.58
+- x: 1.57
+
+===
+logs/202406/20240605-212013.py
+
+test if we can replace gelu with a x-1.5tanh(x)
+
+===
+logs/202406/20240605-215750.py
+
+test if we can replace gelu with a x-1.5tanh(x)

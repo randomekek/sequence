@@ -1,14 +1,6 @@
-# %%
-from einops import einsum, rearrange, reduce, repeat
-from funtree import dropout, norm, rms_norm
-import funtree
-import jax
-import jax.numpy as jnp
-import jax.random as jr
-import json
-import optax
-import utils
-
+"""
+test if we can replace gelu with relu
+"""
 
 def main():
     from einops import einsum, rearrange, reduce
@@ -24,8 +16,7 @@ def main():
     @funtree.makefun
     def MLP(x, key, up, down, dropout_p: float):
         x_norm = jax.vmap(rms_norm)(x)
-        activation = lambda x: x - 2.5 * jax.nn.tanh(x)
-        expanded = activation(einsum(x_norm, up, 'L E, E U -> L U'))
+        expanded = jax.nn.relu(einsum(x_norm, up, 'L E, E U -> L U'))
         lowered = einsum(expanded, down, 'L U, U E -> L E')
         return dropout(lowered, key, dropout_p)
 
@@ -77,7 +68,7 @@ def main():
                     heads=heads,
                     dropout_p=dropout_p),
                 mlp=MLP(
-                    up=init.he_normal([embed_size, 4 * embed_size]),
+                    up=init.glorot_normal([embed_size, 4 * embed_size]),
                     down=init.glorot_normal([4 * embed_size, embed_size]),
                     dropout_p=dropout_p))
         embedding = emb_scale * init.normal([vocab, embed_size]) * jax.lax.rsqrt(1. * embed_size)
@@ -140,38 +131,69 @@ def main():
                 end_value=1e-4)),
             optax.scale(-1))
         opt_state = optimizer.init(model)
-        model, opt_state, interrupted = utils.optimize(model, opt_state, update, iter_count=2500)
-        outputs[name] = dict(model=model, opt_state=opt_state)
-        if interrupted:
-            break
+        try:
+            model, opt_state = utils.optimize(model, opt_state, update, iter_count=2500)
+            outputs[name] = dict(model=model, opt_state=opt_state)
+        except KeyboardInterrupt:
+            print('interrupt')
+            return outputs
     return outputs
 
 
-outputs = utils.run(main, 'test if we can replace gelu with a x-1.5tanh(x)')
-
-# %%
-
-meta = json.load(open('shakespeare_char/meta.json'))
-char_map = jnp.array([ord(c) for c in meta['chars']])
-model = outputs['linear']['model']
-
-
-def as_text(vals):
-    return ''.join(chr(c) for c in char_map[vals]).replace('\n', '¶')
-
-
-def predict():
-    for a in range(25):
-        k = jax.random.PRNGKey(a)
-        task = tasks(k)[0][0]
-        print(as_text(task))
-        print(' ' + as_text(jnp.argmax(model(task, k), axis=-1)))
-
-
-def generate():
-    x = jnp.array([15])
-    k = jax.random.PRNGKey(0)
-    for i in range(70):
-        next = jnp.argmax(model(x, k)[-1:, :], axis=-1)
-        x = jnp.concatenate([x, next])
-    print(as_text(x))
+"""
+config: base
+00 0000 4.500e+00 0.0it/s 
+01 0043 2.672e+00 8.6it/s 
+02 0086 2.516e+00 8.5it/s 
+03 0129 2.297e+00 8.6it/s 
+04 0172 2.094e+00 8.5it/s 
+05 0215 2.000e+00 8.6it/s 
+06 0258 1.953e+00 8.5it/s 
+07 0301 1.812e+00 8.5it/s 
+08 0344 1.766e+00 8.5it/s 
+09 0387 1.688e+00 8.5it/s 
+10 0430 1.594e+00 8.5it/s 
+11 0473 1.578e+00 8.5it/s 
+12 0516 1.523e+00 8.5it/s 
+13 0559 1.523e+00 8.5it/s 
+14 0602 1.445e+00 8.5it/s 
+15 0645 1.453e+00 8.5it/s 
+16 0688 1.398e+00 8.5it/s 
+17 0731 1.375e+00 8.5it/s 
+18 0774 1.367e+00 8.4it/s 
+19 0817 1.344e+00 8.4it/s 
+20 0860 1.312e+00 8.4it/s 
+21 0903 1.281e+00 8.4it/s 
+22 0946 1.336e+00 8.5it/s 
+23 0989 1.297e+00 8.5it/s 
+24 1032 1.242e+00 8.5it/s 
+25 1075 1.258e+00 8.5it/s 
+26 1118 1.211e+00 8.5it/s 
+27 1161 1.234e+00 8.5it/s 
+28 1204 1.188e+00 8.4it/s 
+29 1247 1.195e+00 8.5it/s 
+30 1290 1.164e+00 8.5it/s 
+31 1333 1.141e+00 8.5it/s 
+32 1375 1.188e+00 8.4it/s 
+33 1418 1.117e+00 8.4it/s 
+34 1460 1.133e+00 8.4it/s 
+35 1503 1.117e+00 8.4it/s 
+36 1546 1.133e+00 8.4it/s 
+37 1588 1.117e+00 8.4it/s 
+38 1630 1.109e+00 8.4it/s 
+39 1672 1.047e+00 8.4it/s 
+40 1714 1.055e+00 8.4it/s 
+41 1756 1.031e+00 8.4it/s 
+42 1798 9.844e-01 8.4it/s 
+43 1840 1.008e+00 8.4it/s 
+44 1882 1.031e+00 8.4it/s 
+45 1924 9.883e-01 8.4it/s 
+46 1966 1.016e+00 8.4it/s 
+47 2009 9.258e-01 8.4it/s 
+48 2052 9.180e-01 8.4it/s 
+49 2095 9.414e-01 8.5it/s 
+50 2137 9.453e-01 8.4it/s 
+51 2179 8.984e-01 8.3it/s 
+interrupt
+xx 2188 8.867e-01  (done)
+"""

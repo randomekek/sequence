@@ -1,13 +1,6 @@
-# %%
-from einops import einsum, rearrange, reduce, repeat
-from funtree import dropout, norm, rms_norm
-import funtree
-import jax
-import jax.numpy as jnp
-import jax.random as jr
-import json
-import optax
-import utils
+"""
+test if we can replace gelu with relu, with he init
+"""
 
 
 def main():
@@ -24,8 +17,7 @@ def main():
     @funtree.makefun
     def MLP(x, key, up, down, dropout_p: float):
         x_norm = jax.vmap(rms_norm)(x)
-        activation = lambda x: x - 2.5 * jax.nn.tanh(x)
-        expanded = activation(einsum(x_norm, up, 'L E, E U -> L U'))
+        expanded = jax.nn.relu(einsum(x_norm, up, 'L E, E U -> L U'))
         lowered = einsum(expanded, down, 'L U, U E -> L E')
         return dropout(lowered, key, dropout_p)
 
@@ -147,31 +139,66 @@ def main():
     return outputs
 
 
-outputs = utils.run(main, 'test if we can replace gelu with a x-1.5tanh(x)')
-
-# %%
-
-meta = json.load(open('shakespeare_char/meta.json'))
-char_map = jnp.array([ord(c) for c in meta['chars']])
-model = outputs['linear']['model']
-
-
-def as_text(vals):
-    return ''.join(chr(c) for c in char_map[vals]).replace('\n', '¶')
-
-
-def predict():
-    for a in range(25):
-        k = jax.random.PRNGKey(a)
-        task = tasks(k)[0][0]
-        print(as_text(task))
-        print(' ' + as_text(jnp.argmax(model(task, k), axis=-1)))
-
-
-def generate():
-    x = jnp.array([15])
-    k = jax.random.PRNGKey(0)
-    for i in range(70):
-        next = jnp.argmax(model(x, k)[-1:, :], axis=-1)
-        x = jnp.concatenate([x, next])
-    print(as_text(x))
+"""
+config: base
+00 0000 5.469e+00 0.0it/s 
+01 0043 2.688e+00 8.5it/s 
+02 0087 2.578e+00 8.7it/s 
+03 0131 2.391e+00 8.6it/s 
+04 0175 2.203e+00 8.6it/s 
+05 0218 2.109e+00 8.5it/s 
+06 0261 2.016e+00 8.5it/s 
+07 0304 1.945e+00 8.5it/s 
+08 0347 1.875e+00 8.5it/s 
+09 0390 1.789e+00 8.5it/s 
+10 0433 1.711e+00 8.6it/s 
+11 0476 1.648e+00 8.6it/s 
+12 0519 1.633e+00 8.5it/s 
+13 0562 1.570e+00 8.5it/s 
+14 0605 1.516e+00 8.5it/s 
+15 0648 1.555e+00 8.5it/s 
+16 0691 1.484e+00 8.5it/s 
+17 0734 1.477e+00 8.5it/s 
+18 0777 1.469e+00 8.5it/s 
+19 0820 1.438e+00 8.5it/s 
+20 0863 1.367e+00 8.4it/s 
+21 0906 1.438e+00 8.5it/s 
+22 0949 1.391e+00 8.5it/s 
+23 0992 1.398e+00 8.4it/s 
+24 1035 1.336e+00 8.5it/s 
+25 1078 1.344e+00 8.6it/s 
+26 1121 1.328e+00 8.6it/s 
+27 1164 1.352e+00 8.5it/s 
+28 1207 1.289e+00 8.6it/s 
+29 1250 1.258e+00 8.6it/s 
+30 1293 1.289e+00 8.6it/s 
+31 1336 1.273e+00 8.5it/s 
+32 1379 1.211e+00 8.5it/s 
+33 1422 1.188e+00 8.5it/s 
+34 1465 1.180e+00 8.4it/s 
+35 1508 1.203e+00 8.4it/s 
+36 1551 1.203e+00 8.4it/s 
+37 1594 1.156e+00 8.4it/s 
+38 1637 1.125e+00 8.4it/s 
+39 1680 1.172e+00 8.5it/s 
+40 1723 1.141e+00 8.5it/s 
+41 1766 1.172e+00 8.4it/s 
+42 1809 1.102e+00 8.4it/s 
+43 1852 1.117e+00 8.4it/s 
+44 1895 1.109e+00 8.4it/s 
+45 1938 1.102e+00 8.4it/s 
+46 1981 1.062e+00 8.4it/s 
+47 2024 1.070e+00 8.5it/s 
+48 2067 1.094e+00 8.5it/s 
+49 2110 1.023e+00 8.5it/s 
+50 2153 1.086e+00 8.5it/s 
+51 2196 1.094e+00 8.5it/s 
+52 2239 1.008e+00 8.5it/s 
+53 2282 1.023e+00 8.5it/s 
+54 2325 9.570e-01 8.6it/s 
+55 2368 1.023e+00 8.6it/s 
+56 2411 9.961e-01 8.5it/s 
+57 2454 9.688e-01 8.5it/s 
+58 2497 1.008e+00 8.5it/s 
+xx 2499 9.531e-01  (done)
+"""
