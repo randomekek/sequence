@@ -22,9 +22,14 @@ def main():
     import utils
 
     @funtree.makefun
-    def MLP(x, key, up, down, dropout_p: float):
+    def MLP(x, key, up, down, base_scale: float, bump: float, dropout_p: float, act: str):
         x_norm = jax.vmap(rms_norm)(x)
-        activation = lambda x: x - 2.5 * jax.nn.tanh(x)
+        activation = {
+            'gelu': jax.nn.gelu,
+            'relu': jax.nn.relu,
+            'sigmoid': lambda x: x - base_scale * (jax.nn.sigmoid(x) - 0.5),
+            'tanh': lambda x: x - bump * base_scale * jax.nn.tanh(1. / base_scale * x),
+        }[act]
         expanded = activation(einsum(x_norm, up, 'L E, E U -> L U'))
         lowered = einsum(expanded, down, 'L U, U E -> L E')
         return dropout(lowered, key, dropout_p)
@@ -66,7 +71,7 @@ def main():
         logits = einsum(unembed, hidden, 'E O, L E -> L O')
         return logits
 
-    def init_gpt(seq_length, layer_count, embed_size, heads, vocab, dropout_p, qk_scale, emb_scale, v_scale):
+    def init_gpt(seq_length, layer_count, embed_size, heads, vocab, dropout_p, qk_scale, emb_scale, v_scale, base_scale, bump, act):
         init = funtree.Initializer(jr.PRNGKey(0))
         def make_layer(init: funtree.Initializer):
             return Block(
@@ -77,9 +82,12 @@ def main():
                     heads=heads,
                     dropout_p=dropout_p),
                 mlp=MLP(
-                    up=init.he_normal([embed_size, 4 * embed_size]),
+                    up=init.glorot_normal([embed_size, 4 * embed_size]),
                     down=init.glorot_normal([4 * embed_size, embed_size]),
-                    dropout_p=dropout_p))
+                    base_scale=base_scale,
+                    bump=bump,
+                    dropout_p=dropout_p,
+                    act=act))
         embedding = emb_scale * init.normal([vocab, embed_size]) * jax.lax.rsqrt(1. * embed_size)
         return GPT(
             embedding=embedding,
@@ -118,7 +126,12 @@ def main():
     seq_length = 256
     base_params = dict(seq_length=seq_length, layer_count=6, embed_size=384, heads=6,
                        vocab=65, dropout_p=0.2, qk_scale=0.1, emb_scale=0.03, v_scale=0.01)
-    models = {'base': init_gpt(**base_params)}
+    models = {
+        f'gelu': init_gpt(**base_params, base_scale=None, bump=None, act='gelu'),
+        f'relu': init_gpt(**base_params, base_scale=None, bump=None, act='relu'),
+        f'sigmoid': init_gpt(**base_params, base_scale=4.0, bump=None, act='sigmoid'),
+        f'tanh': init_gpt(**base_params, base_scale=3.0, bump=1.05, act='tanh'),
+    }
     outputs = {}
     for name, model in models.items():
         print(f'config: {name}')
@@ -140,14 +153,14 @@ def main():
                 end_value=1e-4)),
             optax.scale(-1))
         opt_state = optimizer.init(model)
-        model, opt_state, interrupted = utils.optimize(model, opt_state, update, iter_count=2500)
+        model, opt_state, interrupted = utils.optimize(model, opt_state, update, iter_count=4000)
         outputs[name] = dict(model=model, opt_state=opt_state)
         if interrupted:
             break
     return outputs
 
 
-outputs = utils.run(main, 'test if we can replace gelu with a x-1.5tanh(x)')
+outputs = utils.run(main, 'compare gelu, relu, sigmoid and tanh')
 
 # %%
 
