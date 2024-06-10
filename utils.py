@@ -50,6 +50,8 @@ def run(fn, description, record=True):
         if (datetime.datetime.now() - start_time).total_seconds() < 30:
             print('** NOT SAVING **')
             os.unlink(code_filename)
+            return False
+        return True
     try:
         with open(code_filename, 'x') as code_file:
             code_file.write(f'"""\n{description}\n"""\n\n{inspect.getsource(fn)}\n\n"""\n')
@@ -60,9 +62,9 @@ def run(fn, description, record=True):
     except Exception as e:
         cleanup()
         raise e
-    cleanup()
-    with open(f'log.txt', 'a+') as summary:
-        summary.write(f'\n===\n{code_filename}\n\n{description}\n')
+    if cleanup():
+        with open(f'log.txt', 'a+') as summary:
+            summary.write(f'\n===\n{code_filename}\n\n{description}\n')
     return outputs
 
 
