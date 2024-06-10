@@ -35,6 +35,7 @@ class OutputLogger:
 
 
 def run(fn, description, record=True):
+    print(description)
     if not record:
         print('NOT SAVING')
         return fn()
