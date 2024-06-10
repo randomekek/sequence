@@ -15,8 +15,8 @@ UNSET = Unset()
 def makefun(fn):
     name = fn.__name__
     params = list(inspect.signature(fn).parameters.items())
-    fields = [k for k, v in params if v.annotation not in (bool, int, float)]
-    static = [k for k, v in params if v.annotation in (bool, int, float)]
+    fields = [k for k, v in params if v.annotation not in (bool, int, float, str)]
+    static = [k for k, v in params if v.annotation in (bool, int, float, str)]
     all_fields = set(fields + static)
     def init(self, **kwargs):
         for k in set(kwargs.keys()) - all_fields:
